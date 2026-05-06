@@ -1,0 +1,26 @@
+Download Anaconda Distribution
+https://www.anaconda.com/download/success
+
+Run it and Download anaconda_prompt 
+
+Change the directory to the folder
+
+cd Downloads\AudioDose
+
+Run this command
+
+conda activate yolov8_env
+
+Run this command
+
+python app.py
+
+Go to this link made by using FastAPI
+==================================================
+  AudioDose — FastAPI Server
+  http://localhost:8000
+==================================================
+
+do note that the HTML file is in the template folder and called index.html
+learn and mess with the index.html's relationship with the backend
+strictly index.html ang ginamit kong file name para mag port
