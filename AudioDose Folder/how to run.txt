@@ -6,24 +6,8 @@ AudioDose/
 ├── train.py                ← Trains the YOLOv8 model on your pill images
 ├── app.py                  ← Runs the web server and detection API
 ├── requirements.txt        ← List of Python packages to install
+├── yolov8s.pt              ← pt file
 │
-├── dataset/                ← Your pill images and label files go here
-│   ├── data.yaml           ← Config file that tells YOLOv8 where the data is
-│   ├── train/
-│   │   ├── images/         ← Training photos (.jpg or .png)
-│   │   └── labels/         ← Matching label files (.txt, YOLO format)
-│   ├── valid/
-│   │   ├── images/         ← Validation photos
-│   │   └── labels/
-│   └── test/
-│       ├── images/
-│       └── labels/
-│
-├── runs/                   ← Machine Learning Run Saves Directory
-│   └── detect/
-│       └── models/       
-│           └── pill_detector/
-|               └── weights ← best.pt file is the best run and will be used by app.py AND move it to the other models folder
 ├── models/
 │   └── best.pt             ← Your trained model is saved here after training
 │
