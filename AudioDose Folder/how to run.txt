@@ -1,6 +1,5 @@
 Folder Arrangement
 
-
 AudioDose/
 │
 ├── train.py                ← Trains the YOLOv8 model on your pill images
