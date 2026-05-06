@@ -82,6 +82,11 @@ AudioDose/
 │       ├── images/
 │       └── labels/
 │
+├── runs/                   ← Machine Learning Run Saves Directory
+│   └── detect/
+│       └── models/       
+│           └── pill_detector/
+|               └── weights ← best.pt file is the best run and will be used by app.py AND move it to the other models folder
 ├── models/
 │   └── best.pt             ← Your trained model is saved here after training
 │
