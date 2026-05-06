@@ -26,7 +26,6 @@ AudioDose/
 │
 └── utils/
     └── pill_database.json  ← Database of pill info (name, dosage, warnings, etc.)
-```
 
 Download Anaconda Distribution
 https://www.anaconda.com/download/success
