@@ -1,3 +1,33 @@
+Folder Arrangement
+
+AudioDose/
+│
+├── train.py                ← Trains the YOLOv8 model on your pill images
+├── app.py                  ← Runs the web server and detection API
+├── requirements.txt        ← List of Python packages to install
+│
+├── dataset/                ← Your pill images and label files go here
+│   ├── data.yaml           ← Config file that tells YOLOv8 where the data is
+│   ├── train/
+│   │   ├── images/         ← Training photos (.jpg or .png)
+│   │   └── labels/         ← Matching label files (.txt, YOLO format)
+│   ├── valid/
+│   │   ├── images/         ← Validation photos
+│   │   └── labels/
+│   └── test/
+│       ├── images/
+│       └── labels/
+│
+├── models/
+│   └── best.pt             ← Your trained model is saved here after training
+│
+├── templates/
+│   └── index.html          ← The web UI (the page you see in the browser)
+│
+└── utils/
+    └── pill_database.json  ← Database of pill info (name, dosage, warnings, etc.)
+```
+
 Download Anaconda Distribution
 https://www.anaconda.com/download/success
 
