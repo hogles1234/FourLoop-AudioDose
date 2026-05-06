@@ -1,5 +1,6 @@
 Folder Arrangement
 
+
 AudioDose/
 │
 ├── train.py                ← Trains the YOLOv8 model on your pill images
@@ -18,6 +19,11 @@ AudioDose/
 │       ├── images/
 │       └── labels/
 │
+├── runs/                   ← Machine Learning Run Saves Directory
+│   └── detect/
+│       └── models/       
+│           └── pill_detector/
+|               └── weights ← best.pt file is the best run and will be used by app.py
 ├── models/
 │   └── best.pt             ← Your trained model is saved here after training
 │
