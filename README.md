@@ -1,9 +1,5 @@
 # AudioDose
 ---
-https://codespaces.new/hogles1234/FourLoop-AudioDose](https://super-xylophone-6vgrrqxxwxw7fr6wv-8000.app.github.dev/
-> **For Judges:** Click the badge above. The app will install and launch **automatically** — no commands needed.
-
----
 ## 🧠 What It Does
 | Feature | Details |
 |---|---|
