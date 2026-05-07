@@ -86,7 +86,9 @@ Sakiサキ
 Fremics
 Fatima
 
+
 👥 Acknowledgments
+
 ACOMSS (Adamson Computer Science Society)
 
 Developed by the AudioDose Team.
