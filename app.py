@@ -298,3 +298,12 @@ if __name__ == "__main__":
     print("  http://localhost:8000")
     print("=" * 50)
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+
+import os
+from pathlib import Path
+
+# Resolve absolute paths dynamically based on app.py's location
+BASE_DIR = Path(__file__).resolve().parent
+
+MODEL_PATH = BASE_DIR / "models" / "best.pt"
+DB_PATH    = BASE_DIR / "utils" / "pill_database.json"
