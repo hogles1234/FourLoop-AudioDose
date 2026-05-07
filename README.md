@@ -1,6 +1,6 @@
 # AudioDose
 ---
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/hogles1234/FourLoop-AudioDose)
+[![Open in GitHub Codespaces Link]([https://codespaces.new/hogles1234/FourLoop-AudioDose](https://super-xylophone-6vgrrqxxwxw7fr6wv-8000.app.github.dev/))
 > **For Judges:** Click the badge above. The app will install and launch **automatically** — no commands needed.
 
 ---
@@ -12,20 +12,6 @@
 |  Backend | FastAPI (Python) |
 |  Frontend | HTML + JavaScript |
 |  Environment | GitHub Codespaces |
----
-
-## Project Structure
-
-```
-├── app.py                  # FastAPI server & YOLOv8 inference
-├── requirements.txt        # Python dependencies
-├── static/                 # Frontend (HTML, CSS, JS)
-├── models/                 # YOLOv8 weights (.pt file)
-├── templates/              # HTML templates
-├── utils/                  # Pill database & helpers
-└── .devcontainer/
-    └── devcontainer.json   # Auto-setup for GitHub Codespaces
-```
 ---
 
 ## 🛠️ Tech Stack
