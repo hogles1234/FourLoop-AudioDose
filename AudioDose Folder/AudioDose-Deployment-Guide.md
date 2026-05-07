@@ -1,411 +1,570 @@
-# AudioDose — Deployment Guide
-### How to Put Your App on the Internet Using Vercel or Netlify
+# AudioDose — GitHub Codespaces Deployment Guide
+### Run Your Full App on the Cloud Using GitHub — No Laptop Required
 
 ---
 
-## Understanding the Problem First
+## Table of Contents
 
-Before jumping into steps, it helps to understand **why** this setup is needed.
-
-Your AudioDose app has **two parts** that do completely different jobs:
-
-```
-┌─────────────────────────────────────────────────────┐
-│  FRONTEND (index.html)                               │
-│  • The webpage the user sees                         │
-│  • Buttons, camera, results cards                    │
-│  • Just HTML, CSS, and JavaScript                    │
-│  • Any hosting can run this — including Vercel       │
-│    and Netlify                                       │
-└─────────────────────────────────────────────────────┘
-                        │
-                        │ sends photo via HTTP
-                        ↓
-┌─────────────────────────────────────────────────────┐
-│  BACKEND (app.py)                                    │
-│  • The Python server running on YOUR laptop          │
-│  • Loads the YOLOv8 model (best.pt ~22MB)            │
-│  • Loads PyTorch (~1.5GB installed)                  │
-│  • Does the actual pill detection                    │
-│  • Returns results as JSON                           │
-│  • CANNOT run on Vercel or Netlify                   │
-└─────────────────────────────────────────────────────┘
-```
-
-**Why can't the backend run on Vercel or Netlify?**
-
-Both platforms are designed for lightweight web apps, not machine learning.
-Your app needs PyTorch and YOLOv8 which together are over 1.5GB installed —
-Vercel has a 250MB limit and Netlify has a similar restriction. Even if the
-files fit, the detection itself takes 1-3 seconds of heavy CPU/GPU work which
-exceeds what these platforms allow for serverless functions.
+1. [What is GitHub Codespaces?](#1-what-is-github-codespaces)
+2. [How It Works](#2-how-it-works)
+3. [What You Need Before Starting](#3-what-you-need-before-starting)
+4. [Step 1 — Prepare Your Project](#step-1--prepare-your-project)
+5. [Step 2 — Push to GitHub](#step-2--push-to-github)
+6. [Step 3 — Upload Your Model](#step-3--upload-your-model)
+7. [Step 4 — Add Codespaces Config](#step-4--add-codespaces-config)
+8. [Step 5 — Open GitHub Codespaces](#step-5--open-github-codespaces)
+9. [Step 6 — Run the App](#step-6--run-the-app)
+10. [Step 7 — Make it Public](#step-7--make-it-public)
+11. [Every Time You Want the App Online](#every-time-you-want-the-app-online)
+12. [Free Tier Limits](#free-tier-limits)
+13. [Troubleshooting](#troubleshooting)
+14. [Quick Reference Cheat Sheet](#quick-reference-cheat-sheet)
 
 ---
 
-## The Solution — Split the App
+## 1. What is GitHub Codespaces?
 
-Since we can only use Vercel or Netlify for hosting, we use a tool called
-**ngrok** to create a secure tunnel from the internet directly into your
-laptop. Your laptop does the hard AI work, and Vercel/Netlify just serves
-the webpage.
+GitHub Codespaces is a full cloud computer that runs inside your browser,
+provided by GitHub for free. When you open a Codespace on your project,
+GitHub spins up a Linux machine in the cloud, installs all your Python
+packages, and runs your code — all without touching your laptop.
 
-Here is how it looks when everything is running:
+The important thing for AudioDose is that Codespaces can run **real Python
+servers** including FastAPI, PyTorch, and YOLOv8. This is something Vercel
+and Netlify cannot do because they are limited to lightweight serverless
+functions. Codespaces gives you a full machine.
+
+---
+
+## 2. How It Works
+
+When everything is set up, this is what happens:
 
 ```
-User's Phone/Browser
+User's Phone or Browser
         │
-        │  visits your Netlify/Vercel URL
+        │  visits your Codespaces public URL
+        │  e.g. https://username-audiodose-abc123.app.github.dev
         ↓
-┌───────────────────┐
-│  Netlify / Vercel │   ← free hosting, always on
-│  (index.html)     │
-└───────────────────┘
-        │
-        │  fetch("/detect") → goes to API_BASE URL
-        ↓
-┌───────────────────────────────────────┐
-│  ngrok tunnel                         │
-│  https://abc123.ngrok-free.app        │   ← public HTTPS URL
-│  (running on ngrok's servers)         │
-└───────────────────────────────────────┘
-        │
-        │  forwards traffic securely
-        ↓
-┌───────────────────────────────────────┐
-│  YOUR LAPTOP (must be on and running) │
-│  python start.py → uvicorn app:app    │
-│  → loads best.pt → detects pills      │
-└───────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│  GitHub Codespaces (cloud computer)          │
+│                                             │
+│  ┌─────────────────┐  ┌──────────────────┐  │
+│  │  index.html     │  │  app.py          │  │
+│  │  (frontend)     │  │  (FastAPI)       │  │
+│  │                 │  │                  │  │
+│  │  Camera / UI    │  │  YOLOv8 model    │  │
+│  │  Scan buttons   │  │  best.pt         │  │
+│  │  Results cards  │  │  Detection logic │  │
+│  └─────────────────┘  └──────────────────┘  │
+│                                             │
+│  Both frontend AND backend run here         │
+│  No ngrok needed. No laptop needed.         │
+└─────────────────────────────────────────────┘
 ```
 
-The user never knows the detection is happening on your laptop. To them it
-just looks like a normal website.
+Both the frontend and backend live in the same Codespace. The URL that
+GitHub gives you is public and uses HTTPS automatically, which means the
+camera feature works on mobile without any extra setup.
 
 ---
 
-## What You Need
+## 3. What You Need Before Starting
 
-Before starting, make sure you have all of the following:
-
-- Your trained `best.pt` model in the `AudioDose/models/` folder
-- A GitHub account (free) — https://github.com
-- A Netlify account (free) — https://netlify.com OR a Vercel account (free) — https://vercel.com
-- An ngrok account (free) — https://ngrok.com
-- Your `AudioDose` project folder with all files
+- A GitHub account — https://github.com (free)
+- Your trained `best.pt` model in `AudioDose/models/`
+- Your complete `AudioDose` project folder
+- A browser (Chrome or Edge recommended)
+- That is all — no other accounts or tools needed
 
 ---
 
-## Part 1 — Set Up ngrok
+## Step 1 — Prepare Your Project
 
-ngrok is the tool that makes your laptop reachable from the internet.
-Think of it as a phone number for your laptop — anyone can call it (send
-requests to it) from anywhere in the world.
+Before pushing to GitHub, you need to create two files that tell Git which
+files to ignore and tell GitHub how to set up the Codespace.
 
-### Step 1.1 — Create a Free ngrok Account
+### 1.1 — Create a `.gitignore` File
 
-Go to https://ngrok.com and click Sign Up. Use your email or sign in with
-Google. The free tier is enough for this project.
+This file tells Git NOT to upload certain things. The YOLOv8 model and
+dataset are too large and the virtual environment does not need to go to
+GitHub since it will be reinstalled automatically.
 
-### Step 1.2 — Get Your Auth Token
+Create a file called `.gitignore` in the root of your `AudioDose` folder.
+Open Notepad or VS Code, paste the following, and save it as `.gitignore`
+(make sure there is a dot at the start and no `.txt` extension):
 
-After signing in, go to:
 ```
-https://dashboard.ngrok.com/get-started/your-authtoken
+# Python virtual environments
+venv/
+yolov8_env/
+__pycache__/
+*.pyc
+*.pyo
+
+# Model weights (uploaded separately via GitHub LFS)
+*.pt
+*.onnx
+*.engine
+
+# Dataset (too large — stays on your machine)
+dataset/
+runs/
+yolov8s.pt
+
+# Uploaded images from the app
+static/uploads/
+
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment variables
+.env
 ```
 
-You will see a long string of random characters that looks like this:
+### 1.2 — Create the Codespaces Configuration Folder
+
+Create a folder called `.devcontainer` inside your `AudioDose` folder.
+Inside that folder, create a file called `devcontainer.json` with this
+content:
+
+```json
+{
+  "name": "AudioDose",
+  "image": "mcr.microsoft.com/devcontainers/python:3.10",
+  "postCreateCommand": "pip install -r requirements.txt",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "AudioDose App",
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ]
+    }
+  }
+}
 ```
-2abc123XYZdef456_someMoreCharactersHere
+
+What each part does:
+
+| Setting | What it does |
+|---|---|
+| `image` | Uses Python 3.10 Linux environment |
+| `postCreateCommand` | Automatically runs `pip install -r requirements.txt` when the Codespace starts |
+| `forwardPorts` | Exposes port 8000 so the app is accessible |
+| `visibility: public` | Makes the URL accessible to anyone without logging in |
+| `onAutoForward: openBrowser` | Automatically opens the app in a new tab when it starts |
+
+Your project folder should now look like this:
+
+```
+AudioDose/
+├── .devcontainer/
+│   └── devcontainer.json     ← NEW
+├── .gitignore                ← NEW
+├── app.py
+├── train.py
+├── start.py
+├── requirements.txt
+├── templates/
+│   └── index.html
+├── utils/
+│   └── pill_database.json
+└── models/
+    └── best.pt               ← uploaded separately
 ```
 
-Copy it — you will need it in the next step.
+---
 
-### Step 1.3 — Install ngrok Python Package
+## Step 2 — Push to GitHub
 
-Open your Anaconda Prompt, activate your environment, and run:
+### 2.1 — Create a New Repository on GitHub
+
+1. Go to https://github.com and log in
+2. Click the `+` icon in the top right → **New repository**
+3. Name it `audiodose`
+4. Set it to **Public** (required for free Codespaces on the free tier)
+5. Do NOT check "Add a README" — leave everything unchecked
+6. Click **Create repository**
+
+### 2.2 — Push Your Project
+
+Open Anaconda Prompt, navigate to your project folder, and run these
+commands one by one:
+
 ```bash
-conda activate yolov8_env
-pip install pyngrok
-```
+cd C:\Users\JanMaviric Alcantara\Downloads\AudioDose
 
-### Step 1.4 — Paste Your Token into start.py
-
-Open `AudioDose/start.py` in VS Code. Find this line near the top:
-```python
-NGROK_TOKEN = "PASTE_YOUR_NGROK_AUTH_TOKEN_HERE"
-```
-
-Replace `PASTE_YOUR_NGROK_AUTH_TOKEN_HERE` with your actual token:
-```python
-NGROK_TOKEN = "2abc123XYZdef456_someMoreCharactersHere"
-```
-
-Save the file.
-
----
-
-## Part 2 — Deploy Frontend to Netlify
-
-Netlify is the simplest option — you can deploy by just dragging a folder.
-
-### Step 2.1 — Create a Netlify Account
-
-Go to https://netlify.com and sign up for free. You can use GitHub to sign in.
-
-### Step 2.2 — Deploy by Drag and Drop
-
-This is the easiest method and requires no command line tools.
-
-1. Log in to Netlify
-2. From the main dashboard, look for the section that says **"Want to deploy a new site without connecting to Git?"**
-3. You will see a drag and drop area that says **"Drag and drop your site output folder here"**
-4. Open File Explorer and navigate to your `AudioDose` folder
-5. Drag the **`templates`** folder (the one containing `index.html`) and drop it into that Netlify area
-6. Wait 10-30 seconds for it to upload and process
-7. Netlify will give you a random URL like `https://amazing-otter-12345.netlify.app`
-
-That is your public frontend URL. Write it down.
-
-### Step 2.3 — (Optional) Rename Your Site
-
-The random URL like `amazing-otter-12345` is hard to remember. To change it:
-
-1. Go to your site in Netlify dashboard
-2. Click **Site settings → General → Site details → Change site name**
-3. Type something like `audiodose-ph` → Save
-4. Your URL becomes `https://audiodose-ph.netlify.app`
-
----
-
-## Part 3 — Deploy Frontend to Vercel (Alternative to Netlify)
-
-Use this if you prefer Vercel over Netlify. You only need to do one of
-Part 2 or Part 3 — not both.
-
-### Step 3.1 — Push Your Project to GitHub
-
-Vercel works by connecting to a GitHub repository. Open Anaconda Prompt
-in your `AudioDose` folder and run:
-
-```bash
 git init
-git add templates/ vercel.json
-git commit -m "AudioDose frontend"
+git add .
+git commit -m "AudioDose initial commit"
 git branch -M main
-```
-
-Then go to https://github.com/new, create a new repository called
-`audiodose`, then run:
-
-```bash
 git remote add origin https://github.com/YOUR_USERNAME/audiodose.git
 git push -u origin main
 ```
 
 Replace `YOUR_USERNAME` with your actual GitHub username.
 
-### Step 3.2 — Connect to Vercel
+When prompted, enter your GitHub username and password. If GitHub asks for
+a personal access token instead of a password, generate one at:
+```
+https://github.com/settings/tokens
+```
+Click **Generate new token (classic)**, check the `repo` scope, generate,
+and use that as your password.
 
-1. Go to https://vercel.com and sign in with GitHub
-2. Click **Add New Project**
-3. Find your `audiodose` repository and click **Import**
-4. Vercel will auto-detect the `vercel.json` file
-5. Click **Deploy**
-6. After 1-2 minutes you get a URL like `https://audiodose.vercel.app`
+### 2.3 — Verify the Push
+
+Go to `https://github.com/YOUR_USERNAME/audiodose` in your browser. You
+should see all your project files listed there. The `models/` folder will
+be empty or missing — that is expected, we handle the model next.
 
 ---
 
-## Part 4 — Start Your Backend (Every Session)
+## Step 3 — Upload Your Model
 
-Every time you want the app to be available online, you need to run this
-on your laptop. The moment you close your laptop or stop the script, the
-app will stop working for users.
+The `best.pt` file is around 22MB which is fine for GitHub but it was
+excluded by `.gitignore` so we need to upload it separately. There are
+two ways to do this.
 
-### Step 4.1 — Run the Launcher
+### Option A — Upload Through the GitHub Website (Easiest)
 
-Open Anaconda Prompt, navigate to your project, and run:
+1. Go to your repository on GitHub
+2. Click **Add file → Create new file**
+3. Type `models/placeholder.txt` in the name field and click commit — this creates the `models/` folder
+4. Go back to the repository, click into the `models/` folder
+5. Click **Add file → Upload files**
+6. Drag and drop your `best.pt` file from `AudioDose/models/`
+7. Click **Commit changes**
+
+### Option B — Use Git Large File Storage (For Developers)
+
+GitHub LFS is designed for large files like model weights. Run these
+commands in Anaconda Prompt:
 
 ```bash
-conda activate yolov8_env
-cd C:\Users\JanMaviric Alcantara\Downloads\AudioDose
-python start.py
-```
+# Install Git LFS
+git lfs install
 
-After about 5 seconds you will see something like this:
+# Tell LFS to track .pt files
+git lfs track "*.pt"
 
-```
-=======================================================
-  AudioDose — Public Server Launcher
-=======================================================
+# Add the tracking config
+git add .gitattributes
 
-[→] Starting FastAPI server...
-[→] Opening ngrok tunnel...
-
-=======================================================
-  ✓ Public URL: https://abc123.ngrok-free.app
-  ✓ Local URL : http://localhost:8000
-=======================================================
-
-  → Copy this URL into your Vercel/Netlify frontend:
-
-     https://abc123.ngrok-free.app
-
-  → Keep this terminal open while the app is running.
-  → Press Ctrl+C to stop.
-```
-
-**Copy the Public URL.** You need it in the next step.
-
-### Step 4.2 — Update the Frontend with the ngrok URL
-
-This is the step most people forget. Every time you run `start.py`, ngrok
-gives you a **new different URL**. You must update the frontend with this
-new URL each time, otherwise the webpage will not know where to send
-detection requests.
-
-Open `AudioDose/templates/index.html` in VS Code. Press `Ctrl+F` and
-search for `API_BASE`. You will find this line near the top of the
-`<script>` section:
-
-```javascript
-const API_BASE = "";
-```
-
-Replace it with your ngrok URL in quotes:
-
-```javascript
-const API_BASE = "https://abc123.ngrok-free.app";
-```
-
-Save the file.
-
-### Step 4.3 — Redeploy the Frontend
-
-Since you changed `index.html`, you need to push the update to your
-hosting so users get the new version.
-
-**For Netlify (drag and drop):**
-Go back to https://app.netlify.com, open your site, go to **Deploys**,
-and drag the `templates` folder into the deploy drop zone again.
-
-**For Vercel (GitHub):**
-```bash
-git add templates/index.html
-git commit -m "Update API_BASE with new ngrok URL"
+# Add and push the model
+git add models/best.pt
+git commit -m "Add YOLOv8 model via LFS"
 git push
 ```
-Vercel automatically redeploys whenever you push to GitHub.
+
+You may need to install Git LFS separately from https://git-lfs.com first.
 
 ---
 
-## Part 5 — Test the Full Setup
+## Step 4 — Add Codespaces Config
 
-With everything running, here is how to verify it works end to end:
+If you already created the `.devcontainer` folder in Step 1 and pushed it,
+you can skip this step. If not, push it now:
 
-1. Make sure `start.py` is running in Anaconda Prompt and you can see the ngrok URL
-2. Open your Netlify or Vercel URL in a browser on your phone or another device
-3. Go to the Scan tab
-4. Open the camera or upload a photo
-5. Tap Scan
-6. You should see detections come back within a few seconds
-
-If the scan fails with an error, check the Troubleshooting section below.
+```bash
+git add .devcontainer/
+git add .gitignore
+git commit -m "Add Codespaces config"
+git push
+```
 
 ---
 
-## The Big Catch — ngrok Free Tier URL Changes
+## Step 5 — Open GitHub Codespaces
 
-This is the main limitation of the free setup. Every time you run
-`start.py`, ngrok gives you a completely different URL. This means:
+1. Go to your repository page on GitHub:
+   ```
+   https://github.com/YOUR_USERNAME/audiodose
+   ```
 
-- Session 1: `https://abc123.ngrok-free.app`
-- Session 2: `https://xyz789.ngrok-free.app`
-- Session 3: `https://def456.ngrok-free.app`
+2. Click the green **`<> Code`** button (top right of the file list)
 
-Each time you get a new URL, you have to update `API_BASE` in `index.html`
-and redeploy to Netlify or Vercel. This is annoying but it is free.
+3. Click the **Codespaces** tab
 
-**The paid fix:** ngrok's paid plan ($10/month) lets you claim a permanent
-static URL like `https://audiodose.ngrok.app` that never changes. Once
-you set this up, you never need to update `API_BASE` again.
+4. Click **Create codespace on main**
+
+GitHub will now:
+- Create a new Linux virtual machine in Microsoft Azure
+- Clone your repository onto it
+- Install Python 3.10
+- Run `pip install -r requirements.txt` automatically
+- Open a VS Code editor in your browser
+
+This takes about **3 to 5 minutes** the first time. You will see a loading
+screen with setup logs. Wait until it finishes fully before continuing.
+
+> The free GitHub account gives you 2 CPU cores and 8GB RAM which is enough
+> to run AudioDose. The model loads and runs on CPU in the Codespace.
+
+---
+
+## Step 6 — Run the App
+
+Once the Codespace is ready, you will see a VS Code editor in your browser
+with a terminal at the bottom. If the terminal is not visible, press
+`` Ctrl+` `` to open it.
+
+In the terminal, run:
+
+```bash
+python app.py
+```
+
+You will see the FastAPI startup output:
+
+```
+==================================================
+  AudioDose — FastAPI Server
+  http://localhost:8000
+==================================================
+INFO:     Started server process
+INFO:     Waiting for application startup.
+[→] Loading model from models/best.pt…
+[✓] Model loaded.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000
+```
+
+A popup will appear at the bottom right of the screen saying something like:
+**"Your application running on port 8000 is available. Open in Browser."**
+
+Click **Open in Browser**. Your AudioDose app will open in a new tab.
+
+---
+
+## Step 7 — Make it Public
+
+By default, the Codespace URL is private — only you can see it when logged
+in to GitHub. To share it with others:
+
+### Method 1 — VS Code Ports Tab
+
+1. Look at the bottom panel in VS Code (Codespaces)
+2. Click the **Ports** tab (next to Terminal)
+3. Find port `8000` in the list
+4. Right-click on it
+5. Click **Port Visibility → Public**
+
+The lock icon next to the port will disappear, confirming it is now public.
+
+### Method 2 — Automatic via devcontainer.json
+
+If you used the `devcontainer.json` from Step 1.2 with
+`"visibility": "public"`, this is done automatically when the Codespace
+starts. No manual steps needed.
+
+### Get the Public URL
+
+After making it public, hover over port 8000 in the Ports tab and click
+the **copy icon** next to the URL. It will look like:
+
+```
+https://username-audiodose-abc123defg.app.github.dev
+```
+
+Share this URL with anyone. They can open it in their browser and use the
+full app including camera scanning. The URL stays the same for the lifetime
+of this Codespace — it only changes if you delete and recreate the Codespace.
+
+---
+
+## Every Time You Want the App Online
+
+After the first setup, here is your workflow each session:
+
+```
+1. Go to github.com/YOUR_USERNAME/audiodose
+
+2. Click the green <> Code button → Codespaces tab
+
+3. Click on your existing Codespace to resume it
+   (do NOT create a new one every time — use the same one)
+
+4. Wait for it to load (~30 seconds to resume vs 3-5 min to create)
+
+5. In the terminal, run:
+   python app.py
+
+6. Click "Open in Browser" when the popup appears
+
+7. Share the URL from the Ports tab — app is live!
+```
+
+> Always resume your existing Codespace rather than creating a new one.
+> Creating a new one each time wastes your free hours and gives you a
+> different URL. Resuming the same one is faster and keeps the same URL.
+
+---
+
+## Free Tier Limits
+
+GitHub gives free accounts the following Codespaces allowance each month:
+
+| Resource | Free Allowance |
+|---|---|
+| Compute hours (2-core) | 120 hours per month |
+| Storage | 15 GB per month |
+| Machines | Up to 2 active Codespaces |
+
+120 hours per month is 4 hours per day every day. This is enough for
+regular development and demos. The counter resets on the 1st of each month.
+
+### Auto-Sleep
+
+Codespaces automatically stops after **30 minutes of inactivity** to save
+your free hours. When it stops, the URL goes offline and users will see an
+error. To bring it back:
+
+1. Go to https://github.com/codespaces
+2. Find your stopped Codespace
+3. Click the `...` menu → **Resume**
+4. Run `python app.py` again in the terminal
+
+### Check Your Usage
+
+To see how many hours you have left this month:
+```
+https://github.com/settings/billing
+```
+Scroll down to the Codespaces section.
 
 ---
 
 ## Troubleshooting
 
-### "No pills detected" but the camera is working
+### App opens but shows a blank page or error
 
-The frontend is loaded but the API call is failing. Check:
+The server might still be starting. Wait 10 seconds and refresh the page.
+If it still fails, check the terminal in Codespaces for error messages.
 
-1. Is `start.py` running in Anaconda Prompt? It must stay open.
-2. Is `API_BASE` in `index.html` set to your current ngrok URL?
-3. Did you redeploy after changing `API_BASE`?
-4. Open your browser's DevTools (F12) → Network tab → look for a failed
-   `/detect` request and check the error message.
+### "Model not found at models/best.pt"
 
-### "Failed to fetch" error in the browser console
+The model file was not uploaded. Go to your GitHub repository, check if
+`models/best.pt` exists. If not, go back to Step 3 and upload it.
 
-This means the browser is blocking the request. Two possible causes:
+### "ModuleNotFoundError: No module named 'ultralytics'"
 
-- The ngrok URL in `API_BASE` is wrong or outdated — update it and redeploy
-- Your laptop is asleep or the `start.py` script stopped — restart it
+The packages did not install correctly. Run this in the Codespace terminal:
+```bash
+pip install -r requirements.txt
+```
 
-### Camera doesn't work on the deployed site
+### Camera does not work in the browser
 
-Mobile browsers only allow camera access on HTTPS pages. Netlify and Vercel
-both serve over HTTPS automatically, and ngrok also gives you HTTPS, so
-this should work. If it still fails, make sure you are opening the Netlify
-or Vercel URL and not the `file://` local file.
+Make sure the URL starts with `https://`. GitHub Codespaces always provides
+HTTPS so this should work. If the browser blocks it, click the lock icon
+in the address bar and allow camera access for this site.
 
-### ngrok shows "ERR_NGROK_6022" or similar
+### Port 8000 is not showing in the Ports tab
 
-Your free ngrok session has expired (free accounts get 2 hours per session).
-Just stop `start.py` with Ctrl+C, run it again, and update `API_BASE` with
-the new URL.
+Run `python app.py` first. The port only appears in the Ports tab after
+something is actually running on it.
 
-### "Model not found" error from the backend
+### Codespace takes too long to create
 
-The `best.pt` file is missing. Make sure it exists at
-`AudioDose/models/best.pt`. If it does not exist, you need to run training
-first: `python train.py --model yolov8s.pt`
+This is normal for the first time since it installs PyTorch and ultralytics
+which are large packages. Subsequent resumes are much faster (30 seconds)
+because the packages are already installed and cached.
+
+### "This Codespace is stopped" when visiting the URL
+
+The Codespace auto-slept due to inactivity. Go to
+https://github.com/codespaces, resume it, and run `python app.py` again.
+
+### Free hours ran out
+
+You will get an email from GitHub warning you when hours are low. If they
+run out, the Codespace cannot run until the next month. To avoid this, stop
+the Codespace manually when you are done:
+
+Go to https://github.com/codespaces → click `...` → **Stop codespace**.
+This stops the timer. Only resume it when you need the app to be live.
 
 ---
 
-## Quick Reference — Every Time You Start
+## Updating Your Code
 
+When you make changes to your project files locally (on your laptop) and
+want them to appear in the Codespace, push them to GitHub:
+
+```bash
+# On your laptop — after making changes
+git add .
+git commit -m "describe what you changed"
+git push
 ```
-1. Open Anaconda Prompt
-   conda activate yolov8_env
-   cd C:\Users\JanMaviric Alcantara\Downloads\AudioDose
-   python start.py
 
-2. Copy the ngrok URL from the terminal output
-
-3. Open AudioDose/templates/index.html in VS Code
-   Find:    const API_BASE = "...old url...";
-   Replace: const API_BASE = "https://YOUR-NEW-URL.ngrok-free.app";
-   Save the file.
-
-4. Redeploy frontend:
-   Netlify → drag templates/ folder to deploy area
-   Vercel  → git add . && git commit -m "update url" && git push
-
-5. Open your Netlify/Vercel URL — app is live!
+Then in the Codespace terminal, pull the latest changes:
+```bash
+git pull
+python app.py
 ```
 
 ---
 
-## Summary of All Files and What They Do
+## Quick Reference Cheat Sheet
 
-| File | Purpose |
-|---|---|
-| `templates/index.html` | The frontend — deployed to Netlify or Vercel |
-| `app.py` | The FastAPI backend — runs on your laptop |
-| `start.py` | Starts `app.py` + opens ngrok tunnel together |
-| `netlify.toml` | Tells Netlify where to find `index.html` |
-| `vercel.json` | Tells Vercel how to serve the static frontend |
-| `models/best.pt` | Your trained YOLOv8 pill detection model |
-| `utils/pill_database.json` | Pill info database loaded by `app.py` |
+### First-Time Setup (do once)
+```
+1. Create .gitignore and .devcontainer/devcontainer.json
+2. git init → git add . → git commit → git push
+3. Upload models/best.pt to GitHub manually
+4. Open Codespaces from the green Code button → Create codespace on main
+5. Wait for setup → run: python app.py
+6. Ports tab → right-click port 8000 → Public
+7. Copy and share the URL
+```
+
+### Every Session After That
+```
+1. Go to github.com/YOUR_USERNAME/audiodose
+2. Green Code button → Codespaces → click existing Codespace (resume)
+3. Terminal: python app.py
+4. Open in Browser → share the URL from Ports tab
+5. When done: go to github.com/codespaces → Stop codespace
+```
+
+### Push Code Changes
+```
+On laptop:  git add . → git commit -m "message" → git push
+In Codespace terminal: git pull → python app.py
+```
+
+### Check Free Hours Remaining
+```
+https://github.com/settings/billing → scroll to Codespaces
+```
+
+---
+
+## Comparison With Other Options
+
+| Method | Backend Support | Always Online | Free | Difficulty |
+|---|---|---|---|---|
+| GitHub Codespaces | ✅ Full Python/PyTorch | ❌ Only when open | ✅ 120hrs/mo | Easy |
+| Vercel + ngrok | ✅ Via tunnel | ❌ Laptop must be on | ✅ Yes | Medium |
+| Render.com | ✅ Full Python | ✅ Yes | ⚠️ Sleeps free tier | Medium |
+| Hugging Face Spaces | ✅ Full ML support | ✅ Yes | ✅ Yes | Medium |
+| Local only | ✅ Full | ❌ Same network only | ✅ Yes | Easy |
+
+For a student project or demo, **GitHub Codespaces is the best option**
+because it is free, requires no extra accounts, the URL is always HTTPS
+(camera works on mobile), and everything lives in one place on GitHub.
 
 ---
 
