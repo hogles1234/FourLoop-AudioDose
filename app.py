@@ -48,7 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/templates", StaticFiles(directory="templates"), name="static")
 
 
 # ── LOAD MODEL & DATABASE ─────────────────────────────────────────────────────
@@ -298,10 +298,3 @@ if __name__ == "__main__":
     print("  http://localhost:8000")
     print("=" * 50)
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
-
-import os
-from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / "models" / "best.pt"
-DB_PATH = BASE_DIR / "pill_database.json" # Adjust based on your folder
