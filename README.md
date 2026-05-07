@@ -80,7 +80,8 @@ View the CareCircle logs to see the history of scanned medications.
 🛡️ License
 This project is developed for the CodeKada Online Hackathon.
 
- 👥 Team
+ 👥 Team Four Loop  
+ 
 SogeKing
 Sakiサキ
 Fremics
