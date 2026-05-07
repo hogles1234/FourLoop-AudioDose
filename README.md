@@ -1,7 +1,7 @@
 # AudioDose
 ---
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/hogles1234/FourLoop-AudioDose)
-> **For Judges:** Click the badge above. The app will install and launch **automatically** — no commands needed.
+> **For Judges:** Click the badge above. The app will install and launch
 
 in our case now : https://effective-waddle-4j9v7596x7wwcjq96.github.dev ||||
 https://effective-waddle-4j9v7596x7wwcjq96-8000.app.github.dev   | APP
