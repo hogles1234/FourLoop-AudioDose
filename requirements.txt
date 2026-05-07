@@ -11,3 +11,9 @@ python-multipart>=0.0.9     # Required for FastAPI file uploads
 
 # ── Training utilities ────────────────────────────
 PyYAML>=6.0.1
+
+fastapi
+ultralytics
+opencv-python-headless
+python-multipart
+pillow
