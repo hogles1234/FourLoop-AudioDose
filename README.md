@@ -38,5 +38,9 @@
 ---
 
 ## 👥 Team
+SogeKing
+Sakiサキ
+Fremics
+Fatima
 
 > *(Add your team members here)*
