@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>AudioDose | Smart Medication Assistant</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<style>
+    * { transition: all 0.2s ease; }
+    body {
+        background: #0B1220;
+        color: #F1F5F9;
+        font-family: 'Segoe UI', system-ui, -apple-system, 'Inter', sans-serif;
+    }
+    .container { max-width: 1000px; margin-top: 24px; margin-bottom: 80px; }
+    .card, .modal-content {
+        background: #111C2E;
+        border: 4px solid #1E2A3E;
+        border-radius: 24px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+    }
+    .nav-tabs .nav-link { color: #CBD5E1; background: transparent; border: none; font-weight: 600; padding: 12px 24px; }
+    .nav-tabs .nav-link.active { color: #60A5FA; background: #111C2E; border-bottom: 3px solid #3B82F6; }
+
+    /* Scan mode toggle */
+    .scan-mode-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .scan-mode-tab {
+        flex: 1; padding: 10px 0; border: 2px solid #1E2A3E; border-radius: 60px;
+        background: #0A111F; color: #94A3B8; font-weight: 600; font-size: 0.9rem;
+        cursor: pointer; text-align: center; transition: all 0.2s;
+    }
+    .scan-mode-tab.active { background: #3B82F6; border-color: #3B82F6; color: white; }
+    .scan-mode-tab:hover:not(.active) { border-color: #3B82F6; color: #CBD5E1; }
+
+    /* Camera viewport */
+    .camera-box {
+        background: #0A111F;
+        border: 2px dashed #3B82F6;
+        border-radius: 32px;
+        overflow: hidden;
+        position: relative;
+        min-height: 280px;
+        display: flex; align-items: center; justify-content: center;
+    }
+    #cam-video { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 30px; }
+    .cam-idle-overlay {
+        position: absolute; inset: 0; z-index: 5;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+        background: #0A111F; border-radius: 30px;
+        transition: opacity 0.4s;
+    }
+    .cam-idle-overlay.hidden { opacity: 0; pointer-events: none; }
+    .cam-idle-overlay i { color: #3B82F6; }
+    .cam-idle-overlay p { color: #CBD5E1; margin: 0; font-size: 0.9rem; }
+
+    /* Corner brackets */
+    .cam-corner { position: absolute; z-index: 6; width: 24px; height: 24px; pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+    .camera-box.active .cam-corner { opacity: 1; }
+    .cam-corner.tl { top: 14px; left: 14px; border-top: 3px solid #60A5FA; border-left: 3px solid #60A5FA; border-radius: 4px 0 0 0; }
+    .cam-corner.tr { top: 14px; right: 14px; border-top: 3px solid #60A5FA; border-right: 3px solid #60A5FA; border-radius: 0 4px 0 0; }
+    .cam-corner.bl { bottom: 14px; left: 14px; border-bottom: 3px solid #60A5FA; border-left: 3px solid #60A5FA; border-radius: 0 0 0 4px; }
+    .cam-corner.br { bottom: 14px; right: 14px; border-bottom: 3px solid #60A5FA; border-right: 3px solid #60A5FA; border-radius: 0 0 4px 0; }
+
+    /* Scan line */
+    .scan-line {
+        position: absolute; left: 0; right: 0; z-index: 7; height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(96,165,250,0.6), #60A5FA, rgba(96,165,250,0.6), transparent);
+        box-shadow: 0 0 12px rgba(96,165,250,0.6);
+        opacity: 0; pointer-events: none; top: 5%;
+    }
+    .camera-box.scanning .scan-line { opacity: 1; animation: sweep 1.6s ease-in-out infinite; }
+    @keyframes sweep { 0%{top:5%} 50%{top:92%} 100%{top:5%} }
+
+    /* Flash */
+    .cam-flash { position: absolute; inset: 0; z-index: 10; background: white; opacity: 0; pointer-events: none; border-radius: 30px; }
+    .cam-flash.flash { animation: doflash 0.2s ease-out forwards; }
+    @keyframes doflash { 0%{opacity:0.85} 100%{opacity:0} }
+
+    /* Auto-scan bar */
+    .autoscan-bar { position: absolute; bottom: 0; left: 0; right: 0; z-index: 8; height: 4px; background: rgba(59,130,246,0.15); display: none; border-radius: 0 0 30px 30px; }
+    .autoscan-fill { height: 100%; background: #3B82F6; box-shadow: 0 0 8px #3B82F6; width: 0%; transition: width linear; border-radius: 0 0 30px 30px; }
+
+    /* Buttons */
+    .btn-scan {
+        background: #3B82F6; border: none; padding: 14px; border-radius: 60px;
+        font-weight: bold; letter-spacing: 1px; color: white;
+        box-shadow: 0 4px 12px rgba(59,130,246,0.3); width: 100%;
+    }
+    .btn-scan:hover { background: #2563EB; transform: scale(0.98); }
+    .btn-scan:disabled { opacity: 0.4; transform: none; cursor: not-allowed; }
+    .btn-open-cam {
+        background: transparent; border: 2px solid #3B82F6; padding: 12px;
+        border-radius: 60px; font-weight: bold; color: #60A5FA; width: 100%;
+    }
+    .btn-open-cam:hover { background: #3B82F6; color: white; }
+    .btn-stop-cam {
+        background: transparent; border: 2px solid #EF4444; padding: 12px;
+        border-radius: 60px; font-weight: bold; color: #EF4444; width: 100%; margin-top: 8px;
+    }
+    .btn-stop-cam:hover { background: #EF4444; color: white; }
+    .btn-read-aloud {
+        background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
+        border: none; padding: 12px; border-radius: 60px; font-weight: bold;
+        color: white; box-shadow: 0 4px 12px rgba(139,92,246,0.3); width: 100%;
+    }
+    .btn-read-aloud:hover { background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%); transform: scale(1.02); }
+    .btn-log-taken {
+        background: transparent; border: 2px solid #22C55E; padding: 10px;
+        border-radius: 60px; font-weight: bold; color: #22C55E; width: 100%; margin-top: 8px;
+    }
+    .btn-log-taken:hover { background: #22C55E; color: #020617; }
+
+    /* Drop zone */
+    .drop-zone {
+        background: #0A111F; border: 2px dashed #3B82F6; border-radius: 32px;
+        display: flex; align-items: center; justify-content: center; flex-direction: column;
+        min-height: 280px; color: #CBD5E1; cursor: pointer; position: relative;
+        transition: all 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.drag-over { background: #0D1829; border-color: #60A5FA; }
+    .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-zone i { color: #3B82F6; margin-bottom: 12px; }
+    .drop-zone p { margin: 0; color: #94A3B8; }
+    .drop-zone span { color: #60A5FA; }
+
+    /* Upload preview */
+    .preview-box {
+        display: none; border-radius: 24px; overflow: hidden;
+        border: 2px solid #1E2A3E; position: relative; background: #0A111F;
+    }
+    .preview-box img { display: block; width: 100%; max-height: 320px; object-fit: contain; }
+    .preview-tag {
+        position: absolute; top: 10px; left: 10px;
+        background: rgba(11,18,32,0.85); backdrop-filter: blur(6px);
+        border: 1px solid #1E2A3E; border-radius: 20px;
+        padding: 3px 12px; font-size: 0.75rem; color: #94A3B8;
+    }
+
+    /* Result card */
+    .result-card { background: #0F172A; border-radius: 28px; padding: 1.2rem; border: 3px solid #3B82F6; }
+    .safe-badge { background: #22C55E; color: #020617; font-weight: bold; }
+    .moderate-badge { background: #FACC15; color: #1e293b; font-weight: bold; }
+    .high-badge { background: #EF4444; color: white; font-weight: bold; }
+
+    /* Detection results */
+    .det-images { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .det-img-wrap { position: relative; }
+    .det-img-wrap img { display: block; width: 100%; border-radius: 20px; border: 2px solid #1E2A3E; background: #0A111F; }
+    .det-img-tag {
+        position: absolute; top: 10px; left: 10px;
+        background: rgba(11,18,32,0.85); backdrop-filter: blur(6px);
+        border: 1px solid #1E2A3E; border-radius: 20px;
+        padding: 3px 12px; font-size: 0.75rem; color: #94A3B8;
+    }
+    .det-pill-card {
+        background: #111C2E; border: 2px solid #1E2A3E; border-radius: 24px;
+        overflow: hidden; margin-bottom: 16px;
+        animation: fadeUp 0.35s ease both;
+    }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    .det-pill-head {
+        background: #0F172A; border-bottom: 2px solid #1E2A3E;
+        padding: 14px 18px; display: flex; align-items: center; gap: 14px;
+    }
+    .conf-arc { width: 48px; height: 48px; flex-shrink: 0; position: relative; display: grid; place-items: center; }
+    .conf-arc svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+    .conf-arc-text { font-size: 11px; font-weight: 700; color: #60A5FA; z-index: 1; }
+    .det-pill-name h5 { font-size: 15px; font-weight: 700; color: #F1F5F9; margin-bottom: 3px; }
+    .det-pill-name .generic { font-size: 12px; color: #94A3B8; }
+    .det-pill-body { padding: 16px 18px; }
+    .pill-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .pill-tag { font-size: 11px; padding: 3px 9px; border-radius: 20px; background: #1E293B; border: 1px solid #334155; color: #94A3B8; }
+    .pill-desc { font-size: 13px; color: #CBD5E1; line-height: 1.65; margin-bottom: 10px; }
+    .pill-inds { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .pill-ind { font-size: 11px; padding: 3px 9px; border-radius: 20px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); color: #93C5FD; }
+    .pill-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .pill-detail .lbl { font-size: 11px; color: #64748B; margin-bottom: 2px; }
+    .pill-detail .val { font-size: 13px; color: #E2E8F0; font-weight: 500; }
+    .pill-warn {
+        background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.25);
+        border-radius: 12px; padding: 10px 14px;
+        font-size: 12px; color: #FCD34D; line-height: 1.55;
+        display: flex; gap: 8px; margin-bottom: 10px;
+    }
+    .pill-warn i { flex-shrink: 0; margin-top: 2px; }
+
+    /* Where to buy */
+    .where-to-buy { margin-top: 12px; border-top: 2px solid #1E2A3E; padding-top: 12px; }
+    .wtb-title { font-size: 12px; color: #64748B; font-weight: 600; margin-bottom: 8px; }
+    .wtb-store {
+        display: flex; align-items: center; justify-content: space-between;
+        background: #0F172A; border: 1px solid #1E2A3E; border-radius: 12px;
+        padding: 9px 13px; margin-bottom: 6px; text-decoration: none; transition: all 0.2s;
+    }
+    .wtb-store:hover { border-color: #3B82F6; background: #0D1829; }
+    .wtb-store .store-name { font-size: 13px; font-weight: 600; color: #E2E8F0; }
+    .wtb-store .store-note { font-size: 11px; color: #64748B; margin-top: 1px; }
+    .wtb-store .store-link { font-size: 11px; color: #60A5FA; display: flex; align-items: center; gap: 4px; }
+
+    /* Speaking badge */
+    .speaking-badge {
+        display: none; align-items: center; gap: 6px;
+        background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3);
+        border-radius: 20px; padding: 4px 12px; font-size: 12px; color: #60A5FA;
+    }
+    .speaking-badge.show { display: flex; }
+    .sound-bars { display: flex; align-items: flex-end; gap: 2px; height: 14px; }
+    .sound-bars span { width: 3px; border-radius: 2px; background: #60A5FA; animation: bar 0.8s ease-in-out infinite; }
+    .sound-bars span:nth-child(1){height:4px;animation-delay:0s}
+    .sound-bars span:nth-child(2){height:10px;animation-delay:.15s}
+    .sound-bars span:nth-child(3){height:6px;animation-delay:.3s}
+    .sound-bars span:nth-child(4){height:12px;animation-delay:.1s}
+    .sound-bars span:nth-child(5){height:4px;animation-delay:.25s}
+    @keyframes bar{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+
+    /* TTS controls */
+    .tts-bar {
+        background: #111C2E; border: 2px solid #1E2A3E; border-radius: 20px;
+        padding: 10px 16px; display: flex; align-items: center; gap: 14px;
+        flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .tts-bar label { font-size: 12px; color: #94A3B8; white-space: nowrap; margin: 0; }
+    .tts-bar input[type=range] { accent-color: #3B82F6; cursor: pointer; }
+    .tts-bar select { background: #0F172A; border: 1px solid #1E2A3E; color: #60A5FA; border-radius: 20px; padding: 4px 10px; font-size: 12px; outline: none; }
+    .tts-bar .tts-val { font-size: 12px; color: #60A5FA; font-weight: 600; min-width: 36px; }
+    .tts-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .tts-toggle input[type=checkbox] { accent-color: #3B82F6; width: 16px; height: 16px; cursor: pointer; }
+
+    /* Confidence slider */
+    .conf-bar {
+        background: #111C2E; border: 2px solid #1E2A3E; border-radius: 20px;
+        padding: 10px 16px; display: flex; align-items: center; gap: 12px; margin-top: 12px;
+    }
+    .conf-bar label { font-size: 12px; color: #94A3B8; white-space: nowrap; margin: 0; }
+    .conf-bar input[type=range] { flex: 1; accent-color: #3B82F6; cursor: pointer; }
+    .conf-bar .conf-val { font-size: 12px; color: #60A5FA; font-weight: 600; min-width: 36px; }
+
+    /* Autoscan toggle */
+    .autoscan-toggle {
+        background: #111C2E; border: 2px solid #1E2A3E; border-radius: 20px;
+        padding: 10px 16px; display: flex; align-items: center; gap: 10px; margin-top: 8px; cursor: pointer;
+    }
+    .autoscan-toggle.on { border-color: #3B82F6; }
+    .autoscan-toggle label { font-size: 12px; color: #94A3B8; margin: 0; cursor: pointer; }
+    .autoscan-toggle input[type=checkbox] { accent-color: #3B82F6; width: 16px; height: 16px; cursor: pointer; }
+
+    /* Scan summary chips */
+    .scan-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .scan-chip { background: #1E293B; border: 1px solid #334155; border-radius: 20px; padding: 4px 13px; font-size: 12px; color: #94A3B8; }
+    .scan-chip span { color: #60A5FA; font-weight: 600; }
+
+    /* Loading */
+    #loadingSection { display: none; text-align: center; padding: 32px; }
+    .spin-ring {
+        width: 52px; height: 52px; margin: 0 auto 14px;
+        border: 3px solid #1E2A3E; border-top-color: #3B82F6;
+        border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Dashboard */
+    .dashboard-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; }
+    .log-item { background: #1E293B; border-radius: 16px; padding: 10px 14px; margin-bottom: 10px; border-left: 4px solid #3B82F6; }
+    .log-item strong { color: #E2E8F0 !important; }
+    .calendar-table td { height: 70px; cursor: pointer; vertical-align: middle; background-color: #0F172A; border-radius: 20px; transition: 0.1s; color: #E2E8F0; }
+    .calendar-table td:hover { background-color: #1E2A44; transform: scale(1.02); }
+    .selected-day { background-color: #3B82F6 !important; color: white; box-shadow: 0 0 0 2px #93C5FD; }
+    .add-fab { position: fixed; bottom: 24px; right: 24px; width: 64px; height: 64px; border-radius: 32px; background: #3B82F6; font-size: 28px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); border: none; z-index: 1050; color: white; }
+    .add-fab:hover { background: #2563EB; transform: scale(1.05); }
+    .time-badge { font-size: 0.75rem; background: #475569; border-radius: 40px; padding: 2px 8px; color: #F1F5F9; }
+    .legend-group { display: flex; gap: 1.5rem; justify-content: flex-start; padding-left: 0.5rem; margin-top: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #E2E8F0; font-weight: 500; }
+    .history-split { display: flex; gap: 1rem; width: 100%; }
+    .schedule-section, .adherence-section { flex: 1; }
+    .section-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: #CBD5E1; letter-spacing: 0.5px; }
+    .schedule-box { background: #0F172A; border-left: 4px solid #3B82F6; border-radius: 16px; padding: 12px; margin-bottom: 12px; }
+    .schedule-box .med-name { font-weight: bold; color: #F1F5F9; font-size: 0.95rem; }
+    .schedule-box .med-details { font-size: 0.75rem; color: #94A3B8; margin-top: 4px; }
+    .adherence-box { background: rgba(34,197,94,0.12); border-left: 4px solid #22C55E; border-radius: 16px; padding: 12px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; }
+    .adherence-box .check-icon { color: #22C55E; font-size: 1.2rem; flex-shrink: 0; }
+    .adherence-content .med-name { font-weight: bold; color: #F1F5F9; font-size: 0.95rem; }
+    .adherence-content .taken-time { font-size: 0.7rem; color: #86EFAC; margin-top: 2px; }
+    .no-data-message { font-size: 0.8rem; color: #94A3B8; text-align: center; padding: 20px 10px; background: #0F172A; border-radius: 16px; }
+    .card h5, .card h6 { color: #F1F5F9; font-weight: 600; }
+    .text-secondary { color: #CBD5E1 !important; }
+    .modal .form-control { color: #F1F5F9 !important; background: #1E293B !important; border-radius: 28px !important; }
+    .modal .form-control:focus { background: #0F172A !important; color: white !important; }
+    .modal label, .modal .modal-title { color: #F1F5F9; }
+    .modal .btn-close { filter: invert(1); }
+    .modal input, .modal select { background: #1E293B; border: 1px solid #3B82F6; color: #F1F5F9; border-radius: 28px; padding: 12px; }
+    .modal input::placeholder { color: #94A3B8; }
+    .modal input:focus { background: #0F172A; color: white; }
+    .modal-content h5, .modal-content p { color: #F1F5F9; }
+    .btn-outline-light { border-color: #475569; color: #E2E8F0; }
+    .btn-outline-light:hover { background-color: #334155; color: white; }
+    .flatpickr-input { background: #1E293B !important; border: 1px solid #3B82F6 !important; color: white !important; border-radius: 48px !important; padding: 12px !important; }
+    .scan-flex { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+    .scan-preview-area { flex: 1; min-width: 280px; display: flex; flex-direction: column; }
+    .result-area { flex: 1; min-width: 280px; }
+    .scan-button-wrapper { margin-top: 12px; width: 100%; }
+    .otc-badge { background: rgba(34,197,94,0.15); border: 1px solid #22C55E; color: #4ADE80; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+    .rx-badge { background: rgba(239,68,68,0.15); border: 1px solid #EF4444; color: #FCA5A5; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+
+    @media (max-width: 768px) {
+        .dashboard-grid { grid-template-columns: 1fr; }
+        .scan-flex { flex-direction: column; align-items: center; }
+        .history-split { flex-direction: column; }
+        .det-images { grid-template-columns: 1fr; }
+    }
+
+    /* ══ CARE CIRCLE – Life360-style ring ══ */
+    .circle-ring-wrapper {
+        display: flex; justify-content: center; align-items: center;
+        margin: 24px 0 16px;
+    }
+    .circle-ring {
+        position: relative; width: 340px; height: 340px;
+    }
+    .circle-hub {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90px; height: 90px; border-radius: 50%;
+        background: #111C2E; border: 3px solid #3B82F6;
+        box-shadow: 0 0 0 8px rgba(59,130,246,0.12), 0 0 0 18px rgba(59,130,246,0.06);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        text-align: center; z-index: 2;
+    }
+    .ring-member {
+        position: absolute; display: flex; flex-direction: column;
+        align-items: center; cursor: pointer;
+        transform: translate(-50%, -50%);
+    }
+    .ring-member-avatar {
+        width: 72px; height: 72px; border-radius: 50%;
+        background: #1E293B; border: 3px solid #1E2A3E;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2.2rem;
+        transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+    }
+    .ring-member:hover .ring-member-avatar {
+        transform: scale(1.1); border-color: #3B82F6;
+        box-shadow: 0 0 12px rgba(59,130,246,0.4);
+    }
+    .ring-member .rname { font-size: 0.78rem; font-weight: 700; margin-top: 5px; white-space: nowrap; }
+    .ring-member .rrelation { font-size: 0.68rem; color: #94A3B8; white-space: nowrap; }
+    #ringCanvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+    .member-list-row {
+        display: flex; gap: 12px; flex-wrap: wrap;
+        justify-content: center; padding: 0 16px;
+        max-width: 680px; margin: 0 auto;
+    }
+    .member-chip {
+        display: flex; align-items: center; gap: 10px;
+        background: #111C2E; border: 2px solid #1E2A3E;
+        border-radius: 40px; padding: 8px 16px 8px 10px;
+        cursor: pointer; min-width: 150px;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .member-chip:hover { border-color: #3B82F6; box-shadow: 0 0 10px rgba(59,130,246,0.2); }
+    .member-chip .chip-avatar {
+        font-size: 1.5rem; width: 38px; height: 38px; border-radius: 50%;
+        background: #1E293B; display: flex; align-items: center; justify-content: center;
+    }
+    .member-chip .chip-info .chip-name { font-weight: 700; font-size: 0.88rem; }
+    .member-chip .chip-info .chip-rel  { font-size: 0.75rem; color: #94A3B8; }
+    .member-chip .chip-arrow { margin-left: auto; color: #475569; font-size: 0.8rem; }
+
+    /* ══ CARE CIRCLE DASHBOARD ══ */
+    .care-dash-grid { display: grid; grid-template-columns: 200px 1fr 1fr; gap: 20px; }
+    @media (max-width: 800px) { .care-dash-grid { grid-template-columns: 1fr; } }
+    .profile-sidebar {
+        border: 3px solid #FACC15; border-radius: 20px;
+        padding: 20px 16px; display: flex; flex-direction: column;
+        align-items: center; gap: 12px; background: #111C2E;
+    }
+    .profile-sidebar .avatar-lg {
+        width: 90px; height: 90px; border-radius: 50%;
+        background: #1E293B; display: flex; align-items: center;
+        justify-content: center; font-size: 3rem; overflow: hidden;
+    }
+    .profile-sidebar .pname    { font-size: 1.3rem; font-weight: 700; }
+    .profile-sidebar .prelation{ color: #94A3B8; font-size: 0.85rem; }
+    .btn-switch-profile {
+        background: #3B82F6; color: white; border: none;
+        border-radius: 30px; padding: 8px 18px; font-weight: 700;
+        cursor: pointer; width: 100%;
+    }
+    .btn-delete-profile {
+        background: #EF4444; color: white; border: none;
+        border-radius: 30px; padding: 8px 18px; font-weight: 700;
+        cursor: pointer; width: 100%;
+    }
+    .btn-switch-profile:hover { background: #2563EB; }
+    .btn-delete-profile:hover { background: #DC2626; }
+
+    /* Avatar picker */
+    .create-avatar-circle {
+        width: 90px; height: 90px; border-radius: 50%;
+        background: #1E293B; border: 3px dashed #64748B;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2.5rem; cursor: pointer; margin: 0 auto 12px;
+    }
+
+    /* Delete confirm */
+    .delete-confirm-card {
+        background: #111C2E; border: 3px solid #EF4444;
+        border-radius: 20px; padding: 32px 24px; text-align: center;
+        max-width: 420px; margin: 0 auto;
+    }
+    .delete-confirm-avatar {
+        width: 90px; height: 90px; border-radius: 50%;
+        background: #1E293B; display: flex; align-items: center;
+        justify-content: center; font-size: 3rem; margin: 0 auto 16px; overflow: hidden;
+    }
+
+    /* Overlay modals */
+    .overlay-modal {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,0.6); z-index: 2000;
+        align-items: center; justify-content: center;
+    }
+    .overlay-modal.open { display: flex; }
+    .overlay-modal .card {
+        width: 90%; max-width: 420px; border-radius: 24px; padding: 28px;
+    }
+    .overlay-modal input {
+        width: 100%; background: #1E293B; border: 1px solid #3B82F6;
+        color: #F1F5F9; border-radius: 28px; padding: 10px 16px;
+        margin-bottom: 12px; outline: none;
+    }
+    .overlay-modal input::placeholder { color: #94A3B8; }
+    .btn-care-yes {
+        background: #22C55E; color: white; border: none;
+        border-radius: 40px; padding: 10px 28px; font-weight: 800;
+        font-size: 1rem; cursor: pointer;
+    }
+    .btn-care-no {
+        background: #EF4444; color: white; border: none;
+        border-radius: 40px; padding: 10px 28px; font-weight: 800;
+        font-size: 1rem; cursor: pointer;
+    }
+    .btn-care-yes:hover { background: #16A34A; }
+    .btn-care-no:hover  { background: #DC2626; }
+    .btn-invite {
+        background: #3B82F6; border: none; padding: 13px;
+        border-radius: 50px; font-weight: bold; color: white;
+        max-width: 240px; width: 100%; margin: 0 auto; display: block;
+        font-size: 1rem; cursor: pointer;
+    }
+    .btn-invite:hover { background: #2563EB; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="fas fa-ear-listen text-primary me-2"></i>AudioDose</h2>
+        <div class="speaking-badge" id="speakingBadge">
+            <div class="sound-bars"><span></span><span></span><span></span><span></span><span></span></div>
+            Speaking...
+        </div>
+    </div>
+
+    <!-- MAIN TABS -->
+    <ul class="nav nav-tabs mb-4" id="mainTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="scan-tab" data-bs-toggle="tab" data-bs-target="#scanPanel" type="button" role="tab">
+                <i class="fas fa-qrcode me-2"></i>Scan Medicine
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboardPanel" type="button" role="tab">
+                <i class="fas fa-th-large me-2"></i>Dashboard & Logs
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="care-tab" data-bs-toggle="tab" data-bs-target="#carePanel" type="button" role="tab"
+                onclick="setTimeout(()=>{ renderCareProfiles(); }, 50)">
+                <i class="fas fa-shield-heart me-2"></i>Care Circle
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+
+        <!-- ══ SCAN PANEL ══ -->
+        <div class="tab-pane fade show active" id="scanPanel" role="tabpanel">
+
+            <!-- Scan mode toggle -->
+            <div class="scan-mode-tabs">
+                <button class="scan-mode-tab active" id="modeTabCam" onclick="switchScanMode('cam')">
+                    <i class="fas fa-camera me-2"></i>Live Camera
+                </button>
+                <button class="scan-mode-tab" id="modeTabUpl" onclick="switchScanMode('upload')">
+                    <i class="fas fa-upload me-2"></i>Upload Photo
+                </button>
+            </div>
+
+            <div id="scanLayout" class="scan-flex align-items-start">
+                <!-- Left: preview area -->
+                <div class="scan-preview-area">
+
+                    <!-- CAMERA MODE -->
+                    <div id="camMode">
+                        <div class="camera-box" id="cameraBox">
+                            <video id="camVideo" autoplay playsinline muted></video>
+                            <canvas id="camCanvas" style="display:none"></canvas>
+                            <div class="cam-corner tl"></div>
+                            <div class="cam-corner tr"></div>
+                            <div class="cam-corner bl"></div>
+                            <div class="cam-corner br"></div>
+                            <div class="scan-line"></div>
+                            <div class="cam-flash" id="camFlash"></div>
+                            <div class="autoscan-bar" id="autoscanBar"><div class="autoscan-fill" id="autoscanFill"></div></div>
+                            <div class="cam-idle-overlay" id="camIdle">
+                                <i class="fas fa-camera-retro fa-3x"></i>
+                                <p>Tap "Open Camera" to start</p>
+                            </div>
+                        </div>
+                        <div class="scan-button-wrapper" id="ctrlOpen">
+                            <button class="btn-open-cam" onclick="openCam()">
+                                <i class="fas fa-camera me-2"></i> Open Camera
+                            </button>
+                        </div>
+                        <div class="scan-button-wrapper" id="ctrlLive" style="display:none">
+                            <button class="btn-scan" id="btnScan" onclick="captureAndScan()">
+                                <i class="fas fa-qrcode me-2"></i> Scan Now
+                            </button>
+                            <button class="btn-stop-cam mt-2" onclick="stopCam()">
+                                <i class="fas fa-stop-circle me-2"></i> Stop Camera
+                            </button>
+                        </div>
+                        <div class="conf-bar">
+                            <label>Confidence</label>
+                            <input type="range" id="camConf" min="10" max="95" value="40" step="5" oninput="$('#camConfVal').text(this.value+'%')">
+                            <div class="conf-val" id="camConfVal">40%</div>
+                        </div>
+                        <div class="autoscan-toggle" id="autoscanToggle" onclick="toggleAutoscan()">
+                            <input type="checkbox" id="autoscanCheck">
+                            <label for="autoscanCheck">Auto-scan every 3 seconds</label>
+                        </div>
+                    </div>
+
+                    <!-- UPLOAD MODE -->
+                    <div id="uplMode" style="display:none">
+                        <div class="drop-zone" id="dropZone">
+                            <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp">
+                            <i class="fas fa-cloud-upload-alt fa-3x"></i>
+                            <p class="mt-2">Drop your pill photo here</p>
+                            <p><span>or click to browse</span> — JPG, PNG, WebP</p>
+                        </div>
+                        <div class="preview-box mt-3" id="previewBox">
+                            <img id="previewImg" alt="Preview">
+                            <div class="preview-tag" id="previewFilename"></div>
+                        </div>
+                        <div class="scan-button-wrapper mt-3">
+                            <button class="btn-scan" id="btnUplScan" onclick="uploadAndScan()" disabled>
+                                <i class="fas fa-search me-2"></i> Detect Pills
+                            </button>
+                            <button class="btn-stop-cam mt-2" id="btnClear" onclick="clearUpload()" style="display:none">
+                                <i class="fas fa-times me-2"></i> Clear
+                            </button>
+                        </div>
+                        <div class="conf-bar">
+                            <label>Confidence</label>
+                            <input type="range" id="uplConf" min="10" max="95" value="40" step="5" oninput="$('#uplConfVal').text(this.value+'%')">
+                            <div class="conf-val" id="uplConfVal">40%</div>
+                        </div>
+                        <div class="conf-bar">
+                            <label>IoU</label>
+                            <input type="range" id="uplIou" min="10" max="90" value="45" step="5" oninput="$('#uplIouVal').text(this.value+'%')">
+                            <div class="conf-val" id="uplIouVal">45%</div>
+                        </div>
+                    </div>
+
+                    <!-- TTS controls (shared) -->
+                    <div class="tts-bar mt-3">
+                        <label class="tts-toggle">
+                            <input type="checkbox" id="ttsEnabled" checked onchange="toggleTTS(this.checked)">
+                            <i class="fas fa-volume-up ms-1"></i> TTS
+                        </label>
+                        <label>Speed</label>
+                        <input type="range" id="ttsRate" min="0.5" max="2" value="1" step="0.1" style="width:80px" oninput="$('#ttsRateVal').text(parseFloat(this.value).toFixed(1)+'×')">
+                        <span class="tts-val" id="ttsRateVal">1.0×</span>
+                        <label>Voice</label>
+                        <select id="ttsVoice"><option value="">Default</option></select>
+                    </div>
+                </div>
+
+                <!-- Right: result area -->
+                <div class="result-area">
+
+                    <!-- Loading -->
+                    <div id="loadingSection">
+                        <div class="spin-ring"></div>
+                        <p class="text-secondary">Analyzing pill…</p>
+                        <p class="small text-secondary">Running YOLOv8 detection</p>
+                    </div>
+
+                    <!-- Idle placeholder -->
+                    <div id="resultPlaceholder" class="result-card text-center py-5">
+                        <i class="fas fa-pills fa-3x text-primary mb-3"></i>
+                        <h5>No scan yet</h5>
+                        <p class="text-secondary small">Open the camera or upload a photo, then tap Scan.</p>
+                    </div>
+
+                    <!-- Detection results -->
+                    <div id="detResults" style="display:none">
+                        <div class="scan-chips" id="scanChips"></div>
+                        <div class="det-images" id="detImages"></div>
+                        <div id="detCards"></div>
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn-read-aloud flex-fill" id="speakResultBtn">
+                                <i class="fas fa-volume-up me-2"></i> Read Aloud
+                            </button>
+                            <button class="btn w-100" style="background:#1E293B;color:#E2E8F0;border:2px solid #334155;border-radius:60px;font-weight:bold" onclick="resetScan()">
+                                <i class="fas fa-redo me-2"></i> Scan Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tempMessage" class="mt-3 text-center"></div>
+        </div>
+
+        <!-- ══ DASHBOARD PANEL ══ -->
+        <div class="tab-pane fade" id="dashboardPanel" role="tabpanel">
+            <div class="dashboard-grid">
+                <div class="card p-3">
+                    <h5><i class="fas fa-history me-2 text-primary"></i>Medicine Logs</h5>
+                    <div id="logListContainer" style="max-height:800px;overflow-y:auto">
+                        <p class="text-secondary">📭 No logs yet. Scan or use + button.</p>
+                    </div>
+                </div>
+                <div>
+                    <div class="card p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button class="btn btn-sm btn-outline-light" id="prevMonthBtn"><i class="fas fa-chevron-left"></i></button>
+                            <h5 id="monthLabel" class="m-0"></h5>
+                            <button class="btn btn-sm btn-outline-light" id="nextMonthBtn"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                        <table class="table table-dark table-bordered text-center calendar-table mt-3">
+                            <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
+                            <tbody id="calendarBody"></tbody>
+                        </table>
+                        <div class="legend-group">
+                            <span class="legend-item"><i class="fas fa-check-circle" style="color:#4ADE80"></i> Taken</span>
+                            <span class="legend-item"><i class="fas fa-calendar-day" style="color:#FBBF24"></i> Today</span>
+                            <span class="legend-item"><i class="fas fa-clock" style="color:#38BDF8"></i> Upcoming</span>
+                        </div>
+                    </div>
+                    <div class="card p-3">
+                        <h6><i class="fas fa-clipboard-list me-2"></i>Daily Medication Summary</h6>
+                        <div id="dayHistoryPanel" class="history-split" style="min-height:240px"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ CARE CIRCLE PANEL ══ -->
+        <div class="tab-pane fade" id="carePanel" role="tabpanel">
+
+            <!-- VIEW 1: Life360-style ring overview -->
+            <div id="careCircleListView">
+                <h3 class="text-center fw-bold mb-1">Care Circle Mode</h3>
+                <p class="text-center text-secondary small mb-3">Tap a member to view their medication dashboard (read-only)</p>
+
+                <div class="circle-ring-wrapper">
+                    <div class="circle-ring" id="circleRing">
+                        <div class="circle-hub">
+                            <i class="fas fa-shield-heart" style="font-size:1.6rem;color:#3B82F6;"></i>
+                            <div style="font-size:0.7rem;color:#94A3B8;margin-top:4px;">AudioDose<br>Circle</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="member-list-row" id="memberListRow"></div>
+
+                <div class="text-center mt-4 mb-3">
+                    <button class="btn-invite" onclick="openAddProfileModal()">
+                        <i class="fas fa-user-plus me-2"></i> Invite Member
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW 2: Member's read-only dashboard -->
+            <div id="careCircleDashView" style="display:none;">
+                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                    <h3 class="fw-bold mb-0" id="careDashTitle">Dashboard</h3>
+                    <button class="btn-switch-profile" style="width:auto;padding:8px 20px;" onclick="showCareCircleList()">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Circle
+                    </button>
+                </div>
+                <div class="care-dash-grid">
+                    <!-- Profile sidebar -->
+                    <div class="profile-sidebar">
+                        <div class="avatar-lg" id="careDashAvatar">👤</div>
+                        <div class="pname" id="careDashName">—</div>
+                        <div class="prelation" id="careDashRelation">—</div>
+                        <hr style="width:100%;border-color:#1E2A3E;">
+                        <div class="text-center" style="font-size:0.78rem;color:#94A3B8;">
+                            <i class="fas fa-eye me-1"></i> Viewing only
+                        </div>
+                        <div style="font-size:0.72rem;color:#475569;margin-top:6px;text-align:center;">
+                            Read-only access. You can't edit this member's data.
+                        </div>
+                        <button class="btn-delete-profile mt-2" onclick="openDeleteConfirm()">
+                            <i class="fas fa-trash me-1"></i> Remove
+                        </button>
+                    </div>
+
+                    <!-- Medication log -->
+                    <div class="card p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0" id="careDashLogTitle">Medication Log</h6>
+                            <button class="btn-read-aloud" style="width:auto;padding:5px 12px;font-size:0.78rem;" onclick="speakCareLog()">
+                                <i class="fas fa-volume-up me-1"></i> Read All
+                            </button>
+                        </div>
+                        <div id="careLogContainer" style="max-height:300px;overflow-y:auto;">
+                            <p class="text-secondary small">No logs yet.</p>
+                        </div>
+                    </div>
+
+                    <!-- Care calendar -->
+                    <div>
+                        <div class="card p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <button class="btn btn-sm btn-outline-light" id="carePrevMonthBtn"><i class="fas fa-chevron-left"></i></button>
+                                <h6 id="careMonthLabel" class="m-0"></h6>
+                                <button class="btn btn-sm btn-outline-light" id="careNextMonthBtn"><i class="fas fa-chevron-right"></i></button>
+                            </div>
+                            <table class="table table-dark table-bordered text-center calendar-table mt-3">
+                                <thead><tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr></thead>
+                                <tbody id="careCalendarBody"></tbody>
+                            </table>
+                            <div class="legend-group">
+                                <span class="legend-item"><i class="fas fa-check-circle" style="color:#4ADE80"></i> Taken</span>
+                                <span class="legend-item"><i class="fas fa-calendar-day" style="color:#FBBF24"></i> Today</span>
+                                <span class="legend-item"><i class="fas fa-clock" style="color:#38BDF8"></i> Upcoming</span>
+                            </div>
+                        </div>
+                        <div class="card p-3">
+                            <h6 class="small mb-1"><i class="fas fa-clipboard-list me-1"></i>Selected Day History</h6>
+                            <div id="careDayHistoryPanel" class="small text-secondary">Click a date to view logs</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /tab-content -->
+</div>
+
+<!-- FAB -->
+<button class="add-fab btn" id="manualAddFab" data-bs-toggle="modal" data-bs-target="#manualLogModal">
+    <i class="fas fa-plus"></i>
+</button>
+
+<!-- MODALS -->
+<div class="modal fade" id="manualLogModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content p-4">
+            <h5 class="mb-3"><i class="fas fa-edit text-primary"></i> Manually Add Taken Medicine</h5>
+            <input type="text" id="manualMedName" class="form-control mb-3" placeholder="Medicine name (e.g., Biogesic)">
+            <input type="text" id="manualDosage" class="form-control mb-3" placeholder="Dosage (e.g., 500mg)">
+            <input type="text" id="manualTimePicker" class="form-control mb-3" placeholder="Select time taken">
+            <button class="btn btn-success w-100" id="confirmManualAddBtn"><i class="fas fa-save"></i> Add to Log</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="scheduleModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content p-4">
+            <h5 class="mb-3"><i class="fas fa-calendar-plus text-primary"></i> Schedule Medicine</h5>
+            <input type="text" id="schedName" class="form-control mb-3" placeholder="Medicine name">
+            <input type="text" id="schedDosage" class="form-control mb-3" placeholder="Dosage (e.g., 500mg)">
+            <input type="text" id="schedTimePicker" class="form-control mb-3" placeholder="Scheduled time">
+            <button class="btn btn-primary w-100" id="saveScheduleBtn">Set Schedule</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="takeConfirmModal" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content p-4 text-center">
+            <i class="fas fa-question-circle fa-3x text-warning mb-2"></i>
+            <h5>Did you take this medicine?</h5>
+            <p id="confirmMedLabel" class="text-secondary mt-1 small"></p>
+            <div class="d-flex gap-3 mt-3 justify-content-center">
+                <button class="btn btn-success px-4" id="confirmYesBtn">Yes, taken</button>
+                <button class="btn btn-danger px-4" id="confirmNoBtn">No, remind me</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ ADD PROFILE MODAL (Care Circle) ══ -->
+<div id="addProfileModal" class="overlay-modal" onclick="if(event.target===this)closeAddProfileModal()">
+    <div class="card p-4">
+        <h5 class="text-center fw-bold mb-1">Create Profile</h5>
+        <p class="text-center small text-secondary mb-3">Add a member you'd like to keep an eye on</p>
+        <div class="create-avatar-circle" onclick="cycleAvatar()" id="createAvatarDisplay">👤</div>
+        <p class="text-center small text-secondary mb-3">Tap avatar to change</p>
+        <label class="fw-bold mb-1" style="color:#F1F5F9;">Name:</label>
+        <input type="text" id="newProfileName" placeholder="Enter name">
+        <label class="fw-bold mb-1" style="color:#F1F5F9;">Relationship:</label>
+        <input type="text" id="newProfileRelation" placeholder="e.g., Sister, Friend, Wife">
+        <div class="d-flex gap-3 justify-content-center mt-2">
+            <button class="btn-care-yes px-4" onclick="createProfile()">Create Profile</button>
+            <button class="btn-care-no px-4" onclick="closeAddProfileModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ DELETE CONFIRM MODAL (Care Circle) ══ -->
+<div id="deleteConfirmModal" class="overlay-modal" onclick="if(event.target===this)closeDeleteConfirm()">
+    <div class="delete-confirm-card">
+        <div class="delete-confirm-avatar" id="deleteAvatar">👤</div>
+        <p class="fw-bold fs-5 mb-3" id="deleteConfirmText">Are you sure you want to remove this profile?</p>
+        <div class="d-flex gap-3 justify-content-center">
+            <button class="btn-care-no px-4" onclick="confirmDeleteProfile()">DELETE</button>
+            <button class="btn-care-yes px-4" onclick="closeDeleteConfirm()">CANCEL</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────
+let stream = null, autoTimer = null, autoEnabled = false;
+let selectedFile = null, lastDetections = [], currentScanMode = 'cam';
+let medicationLogs = [], schedules = {};
+let currentCalendarDate = new Date(), selectedDateStr = null, lastScannedMedicine = null;
+let ttsEnabled = true, voices = [];
+const synth = window.speechSynthesis;
+const AUTOSCAN_INTERVAL = 3000;
+
+// ── CARE CIRCLE STATE ──────────────────────────────────────────────────
+let careProfiles = [
+    { id: 1, name: "Robin",  relation: "Sister", avatar: "👩", logs: [] },
+    { id: 2, name: "Ted",    relation: "Friend",  avatar: "👦", logs: [
+        { medicine: "Atorvastatin", dosage: "20mg",  timeTaken: "21:30", date: new Date().toISOString().split('T')[0], riskLevel: "Safe",          riskMessage: "Taken on time." },
+        { medicine: "Metformin",    dosage: "500mg",  timeTaken: "19:00", date: new Date().toISOString().split('T')[0], riskLevel: "Moderate Risk", riskMessage: "Taken >30 min from schedule." },
+        { medicine: "Lisinopril",   dosage: "10mg",   timeTaken: "08:00", date: new Date().toISOString().split('T')[0], riskLevel: "High Risk",     riskMessage: "Unscheduled medication." },
+    ]},
+    { id: 3, name: "Lily",   relation: "Wife",    avatar: "👩‍🦱", logs: [] },
+];
+let activeCareProfileId = null;
+let careCalendarDate    = new Date();
+let avatarOptions = ["👤","👩","👦","👴","👵","🧑","👧","👨","🧒","🧓"];
+let avatarIndex   = 0;
+
+// ── TTS ────────────────────────────────────────────────────────────────
+function loadVoices() {
+    voices = synth.getVoices();
+    const sel = document.getElementById('ttsVoice');
+    sel.innerHTML = '<option value="">Default</option>';
+    voices.forEach((v, i) => {
+        const o = document.createElement('option');
+        o.value = i;
+        o.textContent = (v.lang.startsWith('en') ? '★ ' : '') + v.name;
+        sel.appendChild(o);
+    });
+}
+loadVoices();
+if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
+
+function toggleTTS(enabled) {
+    ttsEnabled = enabled;
+    if (!ttsEnabled) { synth.cancel(); $('#speakingBadge').removeClass('show'); }
+}
+
+function speak(text) {
+    if (!ttsEnabled || !text) return;
+    synth.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = parseFloat($('#ttsRate').val());
+    utt.pitch = 1; utt.lang = 'en-PH';
+    const vi = $('#ttsVoice').val();
+    if (vi !== '' && voices[vi]) utt.voice = voices[vi];
+    utt.onstart = () => $('#speakingBadge').addClass('show');
+    utt.onend = utt.onerror = () => $('#speakingBadge').removeClass('show');
+    synth.speak(utt);
+}
+
+function buildTTSScript(data) {
+    if (!data.detections.length) return 'No pills detected. Please move closer or improve lighting.';
+    const c = data.detections.length;
+    let s = `Detected ${c} pill${c > 1 ? 's' : ''}. `;
+    data.detections.forEach((det, i) => {
+        const info = det.pill_info || {};
+        if (c > 1) s += `Pill ${i + 1}: `;
+        s += `${info.name || det.class_name}. `;
+        if (info.generic_name && info.generic_name !== 'Unknown') s += `Generic name: ${info.generic_name}. `;
+        s += info.available_otc === false ? 'Prescription only. ' : 'Available over the counter. ';
+        if (info.dosage_instructions) s += `Dosage: ${info.dosage_instructions}. `;
+        if (info.warnings && info.warnings !== 'Please consult a pharmacist or physician.') s += `Warning: ${info.warnings} `;
+    });
+    return s.trim();
+}
+
+$('#speakResultBtn').click(function () {
+    if (lastDetections.length) speak(buildTTSScript({ detections: lastDetections }));
+    else speak('No medicine scanned yet.');
+});
+
+// ── SCAN MODE ──────────────────────────────────────────────────────────
+function switchScanMode(mode) {
+    currentScanMode = mode;
+    $('#modeTabCam').toggleClass('active', mode === 'cam');
+    $('#modeTabUpl').toggleClass('active', mode === 'upload');
+    $('#camMode').toggle(mode === 'cam');
+    $('#uplMode').toggle(mode === 'upload');
+    if (mode !== 'cam' && stream) stopCam();
+    synth.cancel();
+    $('#detResults').hide();
+    $('#resultPlaceholder').show();
+}
+
+// ── CAMERA ─────────────────────────────────────────────────────────────
+async function openCam() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false
+        });
+        document.getElementById('camVideo').srcObject = stream;
+        await document.getElementById('camVideo').play();
+        $('#camIdle').addClass('hidden');
+        $('#cameraBox').addClass('active');
+        $('#ctrlOpen').hide(); $('#ctrlLive').show();
+        speak('Camera ready. Point at a pill and tap Scan Now.');
+    } catch (err) {
+        if (err.name === 'NotAllowedError') alert('Camera permission denied.');
+        else if (err.name === 'NotFoundError') alert('No camera found on this device.');
+        else alert('Camera error: ' + err.message);
+    }
+}
+
+function stopCam() {
+    synth.cancel(); stopAutoscan();
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    document.getElementById('camVideo').srcObject = null;
+    $('#camIdle').removeClass('hidden');
+    $('#cameraBox').removeClass('active scanning');
+    $('#ctrlOpen').show(); $('#ctrlLive').hide();
+    $('#speakingBadge').removeClass('show');
+}
+
+function toggleAutoscan() {
+    if (!stream) { $('#autoscanCheck').prop('checked', false); return; }
+    autoEnabled = $('#autoscanCheck').prop('checked');
+    $('#autoscanToggle').toggleClass('on', autoEnabled);
+    if (autoEnabled) { $('#autoscanBar').show(); scheduleAutoscan(); }
+    else { stopAutoscan(); $('#autoscanBar').hide(); }
+}
+
+function scheduleAutoscan() {
+    if (!autoEnabled) return;
+    $('#autoscanFill').css({ transition: 'none', width: '0%' });
+    setTimeout(() => $('#autoscanFill').css({ transition: `width ${AUTOSCAN_INTERVAL}ms linear`, width: '100%' }), 30);
+    autoTimer = setTimeout(() => { if (autoEnabled && stream) captureAndScan(); }, AUTOSCAN_INTERVAL);
+}
+
+function stopAutoscan() {
+    autoEnabled = false; clearTimeout(autoTimer);
+    $('#autoscanCheck').prop('checked', false);
+    $('#autoscanToggle').removeClass('on');
+    $('#autoscanBar').hide();
+}
+
+async function captureAndScan() {
+    if (!stream) return;
+    $('#camFlash').addClass('flash'); setTimeout(() => $('#camFlash').removeClass('flash'), 250);
+    const video = document.getElementById('camVideo');
+    const canvas = document.getElementById('camCanvas');
+    canvas.width = video.videoWidth || 1280; canvas.height = video.videoHeight || 720;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    $('#cameraBox').addClass('scanning');
+    $('#btnScan').prop('disabled', true);
+    canvas.toBlob(async (blob) => {
+        await runDetection(blob, parseFloat($('#camConf').val()) / 100, 0.45);
+        $('#cameraBox').removeClass('scanning');
+        $('#btnScan').prop('disabled', false);
+        if (autoEnabled) scheduleAutoscan();
+    }, 'image/jpeg', 0.92);
+}
+
+// ── UPLOAD ─────────────────────────────────────────────────────────────
+$('#fileInput').on('change', function () { handleFile(this.files[0]); });
+$('#dropZone').on('dragover', function (e) { e.preventDefault(); $(this).addClass('drag-over'); });
+$('#dropZone').on('dragleave', function () { $(this).removeClass('drag-over'); });
+$('#dropZone').on('drop', function (e) {
+    e.preventDefault(); $(this).removeClass('drag-over');
+    if (e.originalEvent.dataTransfer.files[0]) handleFile(e.originalEvent.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    selectedFile = file;
+    $('#previewImg').attr('src', URL.createObjectURL(file));
+    $('#previewFilename').text(file.name);
+    $('#previewBox').show();
+    $('#btnUplScan').prop('disabled', false);
+    $('#btnClear').show();
+    $('#detResults').hide();
+    $('#resultPlaceholder').show();
+}
+
+function clearUpload() {
+    selectedFile = null; $('#fileInput').val('');
+    $('#previewBox').hide();
+    $('#btnUplScan').prop('disabled', true);
+    $('#btnClear').hide();
+    $('#detResults').hide();
+    $('#resultPlaceholder').show();
+}
+
+async function uploadAndScan() {
+    if (!selectedFile) return;
+    await runDetection(selectedFile, parseFloat($('#uplConf').val()) / 100, parseFloat($('#uplIou').val()) / 100);
+}
+
+// ── CORE DETECTION ─────────────────────────────────────────────────────
+async function runDetection(blob, conf, iou) {
+    $('#loadingSection').show();
+    $('#detResults').hide();
+    $('#resultPlaceholder').hide();
+    const fd = new FormData(); fd.append('file', blob, 'image.jpg');
+    try {
+        const res = await fetch(`/detect?confidence=${conf}&iou=${iou}`, { method: 'POST', body: fd });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Detection failed'); }
+        const data = await res.json();
+        renderResults(data);
+    } catch (err) {
+        speak('Scan failed. Please try again.');
+        alert('Error: ' + err.message);
+        $('#resultPlaceholder').show();
+    } finally {
+        $('#loadingSection').hide();
+    }
+}
+
+// ── RENDER RESULTS ─────────────────────────────────────────────────────
+function renderResults(data) {
+    lastDetections = data.detections;
+    $('#detResults').show();
+    $('#resultPlaceholder').hide();
+
+    // Chips
+    $('#scanChips').html(`
+        <div class="scan-chip">Found: <span>${data.detection_count}</span></div>
+        <div class="scan-chip">Time: <span>${data.inference_time_ms}ms</span></div>
+        <div class="scan-chip">Mode: <span>${currentScanMode === 'cam' ? 'Camera' : 'Upload'}</span></div>
+    `);
+
+    // Images
+    const capSrc = currentScanMode === 'cam'
+        ? document.getElementById('camCanvas').toDataURL('image/jpeg', 0.92)
+        : (selectedFile ? URL.createObjectURL(selectedFile) : '');
+    $('#detImages').html(`
+        <div class="det-img-wrap"><img src="${capSrc}" alt="Captured"><div class="det-img-tag">${currentScanMode === 'cam' ? 'CAPTURED' : 'UPLOADED'}</div></div>
+        <div class="det-img-wrap"><img src="data:image/jpeg;base64,${data.annotated_image}" alt="Detected"><div class="det-img-tag">DETECTED</div></div>
+    `);
+
+    // Cards
+    if (!data.detections.length) {
+        $('#detCards').html(`
+            <div class="result-card text-center py-4 mb-3">
+                <i class="fas fa-search fa-2x text-secondary mb-3"></i>
+                <h5>No pills detected</h5>
+                <p class="text-secondary small">Try moving closer, improving lighting, or lowering the confidence threshold.</p>
+            </div>
+        `);
+    } else {
+        $('#detCards').html(data.detections.map((det, i) => buildPillCard(det, i)).join(''));
+        // Auto-confirm modal for first detection
+        const first = data.detections[0];
+        const info = first.pill_info || {};
+        const name = info.name || first.class_name;
+        const today = getTodayStr();
+        const matchedSched = (schedules[today] || []).find(s => s.medicine.toLowerCase() === name.toLowerCase());
+        lastScannedMedicine = { medicine: name, dosage: info.dosage || '', scheduledTime: matchedSched ? matchedSched.time : null, matched: !!matchedSched };
+        $('#confirmMedLabel').text(`${name}${info.dosage ? ' — ' + info.dosage : ''}`);
+        setTimeout(() => new bootstrap.Modal(document.getElementById('takeConfirmModal')).show(), 1800);
+    }
+
+    speak(buildTTSScript(data));
+}
+
+function resetScan() {
+    synth.cancel(); lastDetections = [];
+    $('#detResults').hide();
+    $('#resultPlaceholder').show();
+    $('#speakingBadge').removeClass('show');
+}
+
+function buildPillCard(det, i) {
+    const info = det.pill_info || {};
+    const conf = Math.round(det.confidence * 100);
+    const C = 2 * Math.PI * 17; const offset = C - (conf / 100) * C;
+    const isOtc = info.available_otc;
+    const hasInfo = info.generic_name && info.generic_name !== 'Unknown';
+    const inds = (info.indications || []).slice(0, 4).map(x => `<span class="pill-ind">${x}</span>`).join('');
+    const se = (info.side_effects || []).slice(0, 3).join(', ');
+    const stores = (info.where_to_buy || []).map(s => `
+        <a class="wtb-store" href="${s.url}" target="_blank" rel="noopener">
+            <div><div class="store-name">${s.store}</div><div class="store-note">${s.notes}</div></div>
+            <div class="store-link"><i class="fas fa-external-link-alt me-1"></i>Visit</div>
+        </a>`).join('');
+
+    return `
+    <div class="det-pill-card" style="animation-delay:${i * 0.07}s">
+        <div class="det-pill-head">
+            <div class="conf-arc">
+                <svg viewBox="0 0 40 40">
+                    <circle cx="20" cy="20" r="17" fill="none" stroke="#1E293B" stroke-width="3"/>
+                    <circle cx="20" cy="20" r="17" fill="none" stroke="#3B82F6" stroke-width="3"
+                        stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"/>
+                </svg>
+                <span class="conf-arc-text">${conf}%</span>
+            </div>
+            <div class="det-pill-name flex-grow-1">
+                <h5>${info.name || det.class_name}</h5>
+                <div class="generic">${hasInfo ? info.generic_name : '<span class="text-secondary">Unknown — not in database yet</span>'}</div>
+            </div>
+            <span class="${isOtc === false ? 'rx-badge' : 'otc-badge'}">${isOtc === false ? 'Rx Only' : 'OTC'}</span>
+        </div>
+        <div class="det-pill-body">
+            ${hasInfo ? `
+            <div class="pill-tags">
+                ${info.category ? `<span class="pill-tag"><i class="fas fa-tag me-1"></i>${info.category}</span>` : ''}
+                ${info.dosage ? `<span class="pill-tag"><i class="fas fa-pills me-1"></i>${info.dosage}</span>` : ''}
+                ${info.form ? `<span class="pill-tag">${info.form}</span>` : ''}
+                ${info.brand ? `<span class="pill-tag"><i class="fas fa-building me-1"></i>${info.brand}</span>` : ''}
+            </div>
+            ${info.description ? `<p class="pill-desc">${info.description}</p>` : ''}
+            ${inds ? `<div class="pill-inds">${inds}</div>` : ''}
+            <div class="pill-grid">
+                ${info.dosage_instructions ? `<div class="pill-detail" style="grid-column:1/-1"><div class="lbl"><i class="fas fa-clock me-1"></i>Dosage Instructions</div><div class="val">${info.dosage_instructions}</div></div>` : ''}
+                ${info.price_range ? `<div class="pill-detail"><div class="lbl"><i class="fas fa-peso-sign me-1"></i>Price Range</div><div class="val">${info.price_range}</div></div>` : ''}
+                ${se ? `<div class="pill-detail"><div class="lbl"><i class="fas fa-exclamation-circle me-1"></i>Side Effects</div><div class="val">${se}</div></div>` : ''}
+            </div>
+            ${info.warnings ? `<div class="pill-warn"><i class="fas fa-triangle-exclamation"></i><span>${info.warnings}</span></div>` : ''}
+            ${stores ? `<div class="where-to-buy"><div class="wtb-title"><i class="fas fa-store me-1"></i>WHERE TO BUY</div>${stores}</div>` : ''}
+            ` : `<p class="text-secondary small mt-2">No detailed information available for this pill yet. Add it to pill_database.json to show full details.</p>`}
+            <div class="d-flex gap-2 mt-3 flex-wrap">
+                <button class="btn-log-taken flex-fill" onclick="quickLog(${i})">
+                    <i class="fas fa-plus-circle me-1"></i> Log as Taken
+                </button>
+            </div>
+        </div>
+    </div>`;
+}
+
+function quickLog(idx) {
+    const det = lastDetections[idx]; if (!det) return;
+    const info = det.pill_info || {};
+    const name = info.name || det.class_name;
+    const dosage = info.dosage || '';
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const today = getTodayStr();
+    const matchedSched = (schedules[today] || []).find(s => s.medicine.toLowerCase() === name.toLowerCase());
+    const risk = matchedSched ? computeRisk(matchedSched.time, timeStr, true) : { level: 'High Risk', message: 'Not scheduled for today.' };
+    addLogEntry(name, dosage, timeStr, today, risk.level, risk.message);
+    showTemporaryMessage(`✅ Logged: ${name} at ${timeStr}`);
+}
+
+// ── DASHBOARD & LOGS ───────────────────────────────────────────────────
+function getTodayStr() { return new Date().toISOString().split('T')[0]; }
+
+function computeRisk(scheduledTimeStr, actualTimeStr, medicineMatch) {
+    if (!medicineMatch) return { level: 'High Risk', score: 10, message: 'Medicine not scheduled. DO NOT TAKE.' };
+    if (!scheduledTimeStr) return { level: 'Moderate Risk', score: 4, message: 'No schedule time found.' };
+    const [sH, sM] = scheduledTimeStr.split(':').map(Number);
+    const [aH, aM] = actualTimeStr.split(':').map(Number);
+    const diff = Math.abs((sH * 60 + sM) - (aH * 60 + aM));
+    if (diff > 120) return { level: 'High Risk', score: 8, message: 'Taken far outside scheduled time (>2h).' };
+    if (diff > 30) return { level: 'Moderate Risk', score: 3, message: 'Taken >30 min from schedule.' };
+    return { level: 'Safe', score: 0, message: 'Taken on time. Well done!' };
+}
+
+function addLogEntry(medicine, dosage, timeStr, dateStr, riskLevel, riskMessage) {
+    medicationLogs.unshift({ medicine, dosage, timeTaken: timeStr, date: dateStr, riskLevel, riskMessage });
+    updateLogsUI();
+    if (selectedDateStr) refreshHistoryPanel(selectedDateStr);
+    renderCalendar();
+}
+
+function updateLogsUI() {
+    const container = $('#logListContainer');
+    if (!medicationLogs.length) { container.html('<p class="text-secondary">📭 No logs yet. Scan or use + button.</p>'); return; }
+    let html = '';
+    medicationLogs.forEach(log => {
+        const rc = log.riskLevel === 'Safe' ? 'safe-badge' : log.riskLevel.includes('Moderate') ? 'moderate-badge' : 'high-badge';
+        html += `<div class="log-item">
+            <div class="d-flex justify-content-between">
+                <strong><i class="fas fa-capsules me-1"></i>${log.medicine}${log.dosage ? ' (' + log.dosage + ')' : ''}</strong>
+                <span class="time-badge">${log.timeTaken}</span>
+            </div>
+            <small class="text-secondary">${log.date}</small>
+            <div><span class="badge ${rc} mt-1 px-3">${log.riskLevel}</span></div>
+            <div class="small text-muted mt-1">${log.riskMessage}</div>
+        </div>`;
+    });
+    container.html(html);
+}
+
+function confirmTakenMedicine() {
+    if (!lastScannedMedicine) return;
+    const now = new Date();
+    const t = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const risk = lastScannedMedicine.matched && lastScannedMedicine.scheduledTime
+        ? computeRisk(lastScannedMedicine.scheduledTime, t, true)
+        : { level: 'High Risk', message: 'Unscheduled medication.' };
+    addLogEntry(lastScannedMedicine.medicine, lastScannedMedicine.dosage, t, getTodayStr(), risk.level, risk.message);
+    showTemporaryMessage(`✅ Logged: ${lastScannedMedicine.medicine} at ${t}`);
+    bootstrap.Modal.getInstance(document.getElementById('takeConfirmModal'))?.hide();
+    lastScannedMedicine = null;
+}
+
+function cancelReminder() {
+    bootstrap.Modal.getInstance(document.getElementById('takeConfirmModal'))?.hide();
+    showTemporaryMessage('⚠️ Please remember to take your medicine on time.');
+}
+
+function showTemporaryMessage(msg) {
+    $('#tempMessage').html(`<div class="alert alert-info alert-dismissible fade show" role="alert">${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`);
+    setTimeout(() => $('#tempMessage').html(''), 3500);
+}
+
+// ── CALENDAR ───────────────────────────────────────────────────────────
+function formatDateYYYYMMDD(date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; }
+
+function renderCalendar() {
+    const year = currentCalendarDate.getFullYear(), month = currentCalendarDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay(), daysInMonth = new Date(year, month+1, 0).getDate();
+    const todayStr = getTodayStr();
+    const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    $('#monthLabel').text(`${monthNames[month]} ${year}`);
+    let tbody = $('#calendarBody'); tbody.empty();
+    let row = '<tr>', dayC = 1;
+    for (let i = 0; i < firstDay; i++) row += '<td></td>';
+    for (let i = firstDay; i < 7 && dayC <= daysInMonth; i++) {
+        const ds = formatDateYYYYMMDD(new Date(year, month, dayC));
+        const tc = medicationLogs.filter(l => l.date === ds).length;
+        const icon = ds < todayStr ? '🟢' : ds === todayStr ? '🟡' : '🔴';
+        row += `<td data-date="${ds}" class="cal-cell">${dayC}<br><span class="small">${icon}</span>${tc > 0 ? `<br>📋${tc}` : ''}</td>`;
+        dayC++;
+    }
+    row += '</tr>'; tbody.append(row);
+    while (dayC <= daysInMonth) {
+        row = '<tr>';
+        for (let i = 0; i < 7 && dayC <= daysInMonth; i++) {
+            const ds = formatDateYYYYMMDD(new Date(year, month, dayC));
+            const tc = medicationLogs.filter(l => l.date === ds).length;
+            const icon = ds < todayStr ? '🟢' : ds === todayStr ? '🟡' : '🔴';
+            row += `<td data-date="${ds}" class="cal-cell">${dayC}<br><span class="small">${icon}</span>${tc > 0 ? `<br>📋${tc}` : ''}</td>`;
+            dayC++;
+        }
+        row += '</tr>'; tbody.append(row);
+    }
+    $('.cal-cell').click(function () {
+        const d = $(this).data('date'); if (!d) return;
+        selectedDateStr = d;
+        $('.cal-cell').removeClass('selected-day'); $(this).addClass('selected-day');
+        if (d >= getTodayStr()) { window.pendingScheduleDate = d; new bootstrap.Modal(document.getElementById('scheduleModal')).show(); }
+        else refreshHistoryPanel(d);
+    });
+}
+
+function refreshHistoryPanel(dateStr) {
+    const scheds = schedules[dateStr] || [], taken = medicationLogs.filter(l => l.date === dateStr);
+    let sh = `<div class="schedule-section"><div class="section-title"><i class="fas fa-calendar-alt me-1"></i>Medication Schedule</div>`;
+    sh += scheds.length ? scheds.map(s => `<div class="schedule-box"><div class="med-name">💊 ${s.medicine} (${s.dosage})</div><div class="med-details"><i class="far fa-clock"></i> ${s.time}</div></div>`).join('') : '<div class="no-data-message">No medicines scheduled for this day.</div>';
+    sh += '</div>';
+    let ah = `<div class="adherence-section"><div class="section-title"><i class="fas fa-clipboard-check me-1"></i>Adherence Report</div>`;
+    ah += taken.length ? taken.map(l => `<div class="adherence-box"><div class="check-icon"><i class="fas fa-check-circle"></i></div><div class="adherence-content"><div class="med-name">${l.medicine}${l.dosage?' ('+l.dosage+')':''}</div><div class="taken-time"><i class="fas fa-hourglass-half"></i> Taken at: ${l.timeTaken}</div></div></div>`).join('') : '<div class="no-data-message">No recorded intake for this day.</div>';
+    ah += '</div>';
+    $('#dayHistoryPanel').html(`<div class="history-split">${sh}${ah}</div>`);
+}
+
+function saveScheduleForDate() {
+    const target = window.pendingScheduleDate || getTodayStr();
+    const med = $('#schedName').val().trim(), dos = $('#schedDosage').val().trim(), time = $('#schedTimePicker').val();
+    if (!med || !dos || !time) { alert('Please fill all fields'); return; }
+    if (!schedules[target]) schedules[target] = [];
+    schedules[target].push({ medicine: med, dosage: dos, time });
+    bootstrap.Modal.getInstance(document.getElementById('scheduleModal'))?.hide();
+    $('#schedName, #schedDosage, #schedTimePicker').val('');
+    renderCalendar();
+    if (selectedDateStr === target) refreshHistoryPanel(target);
+    showTemporaryMessage(`✅ Scheduled ${med} for ${target} at ${time}`);
+}
+
+function manualAddMedicine() {
+    const med = $('#manualMedName').val().trim(), dos = $('#manualDosage').val().trim(), time = $('#manualTimePicker').val();
+    if (!med || !dos || !time) { alert('Enter all fields'); return; }
+    const today = getTodayStr();
+    const match = (schedules[today] || []).find(s => s.medicine.toLowerCase() === med.toLowerCase());
+    const risk = match ? computeRisk(match.time, time, true) : { level: 'High Risk (Unplanned)', message: 'Not scheduled.' };
+    addLogEntry(med, dos, time, today, risk.level, risk.message);
+    bootstrap.Modal.getInstance(document.getElementById('manualLogModal'))?.hide();
+    $('#manualMedName, #manualDosage, #manualTimePicker').val('');
+    showTemporaryMessage(`➕ Manually added: ${med} at ${time}`);
+}
+
+// ══════════════════════════════════════════════════════
+//  CARE CIRCLE – Life360-style ring
+// ══════════════════════════════════════════════════════
+
+function positionOnRing(index, total, cx, cy, r) {
+    const angle = (2 * Math.PI / total) * index - Math.PI / 2;
+    return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+}
+
+function renderCareProfiles() {
+    const ring = document.getElementById('circleRing');
+    ring.querySelectorAll('.ring-member').forEach(el => el.remove());
+    const oldCanvas = document.getElementById('ringCanvas');
+    if (oldCanvas) oldCanvas.remove();
+    const list = document.getElementById('memberListRow');
+    list.innerHTML = '';
+    const cx = 170, cy = 170, r = 130;
+    const total = careProfiles.length;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute('id', 'ringCanvas');
+    svg.setAttribute('width', '340'); svg.setAttribute('height', '340');
+    svg.style.position = 'absolute'; svg.style.top = '0'; svg.style.left = '0';
+    svg.style.pointerEvents = 'none';
+    careProfiles.forEach((p, i) => {
+        const pos = positionOnRing(i, total || 1, cx, cy, r);
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute('x1', cx); line.setAttribute('y1', cy);
+        line.setAttribute('x2', pos.x); line.setAttribute('y2', pos.y);
+        line.setAttribute('stroke', '#1E2A3E'); line.setAttribute('stroke-width', '2');
+        line.setAttribute('stroke-dasharray', '4 4');
+        svg.appendChild(line);
+        const el = document.createElement('div');
+        el.className = 'ring-member';
+        el.style.left = pos.x + 'px'; el.style.top = pos.y + 'px';
+        el.innerHTML = `<div class="ring-member-avatar">${p.avatar}</div><div class="rname">${p.name}</div><div class="rrelation">${p.relation}</div>`;
+        el.onclick = () => openCareDash(p.id);
+        ring.appendChild(el);
+        const chip = document.createElement('div');
+        chip.className = 'member-chip';
+        chip.innerHTML = `<div class="chip-avatar">${p.avatar}</div><div class="chip-info"><div class="chip-name">${p.name}</div><div class="chip-rel">${p.relation}</div></div><div class="chip-arrow"><i class="fas fa-chevron-right"></i></div>`;
+        chip.onclick = () => openCareDash(p.id);
+        list.appendChild(chip);
+    });
+    ring.insertBefore(svg, ring.querySelector('.circle-hub'));
+}
+
+function showCareCircleList() {
+    document.getElementById('careCircleListView').style.display = 'block';
+    document.getElementById('careCircleDashView').style.display = 'none';
+    renderCareProfiles();
+}
+
+function openCareDash(profileId) {
+    const p = careProfiles.find(x => x.id === profileId);
+    if (!p) return;
+    activeCareProfileId = profileId;
+    document.getElementById('careCircleListView').style.display = 'none';
+    document.getElementById('careCircleDashView').style.display = 'block';
+    document.getElementById('careDashTitle').textContent    = `${p.name}'s Dashboard`;
+    document.getElementById('careDashAvatar').textContent   = p.avatar;
+    document.getElementById('careDashName').textContent     = p.name;
+    document.getElementById('careDashRelation').textContent = p.relation;
+    document.getElementById('careDashLogTitle').textContent = `${p.name}'s Medication Log`;
+    const container = document.getElementById('careLogContainer');
+    if (!p.logs.length) {
+        container.innerHTML = '<p class="text-secondary small">No logs yet.</p>';
+    } else {
+        container.innerHTML = p.logs.map(log => {
+            const rc = log.riskLevel === 'Safe' ? 'safe-badge' : log.riskLevel === 'Moderate Risk' ? 'moderate-badge' : 'high-badge';
+            return `<div class="log-item">
+                <div class="d-flex justify-content-between">
+                    <strong style="font-size:0.88rem;"><i class="fas fa-capsules me-1"></i>${log.medicine} (${log.dosage})</strong>
+                    <span class="time-badge">${log.timeTaken}</span>
+                </div>
+                <small class="text-secondary">${log.date}</small>
+                <div><span class="badge ${rc} mt-1 px-3" style="font-size:0.75rem;">${log.riskLevel}</span></div>
+            </div>`;
+        }).join('');
+    }
+    renderCareCalendar();
+}
+
+function renderCareCalendar() {
+    const p = careProfiles.find(x => x.id === activeCareProfileId);
+    if (!p) return;
+    const logs = p.logs;
+    const year = careCalendarDate.getFullYear(), month = careCalendarDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const todayStr = getTodayStr();
+    const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    document.getElementById('careMonthLabel').textContent = `${monthNames[month]} ${year}`;
+    const tbody = document.getElementById('careCalendarBody');
+    tbody.innerHTML = '';
+    for (let w = 0; w < Math.ceil((firstDay + daysInMonth) / 7); w++) {
+        const tr = document.createElement('tr');
+        for (let d = 0; d < 7; d++) {
+            const td = document.createElement('td');
+            const dayNum = w * 7 + d - firstDay + 1;
+            if (dayNum >= 1 && dayNum <= daysInMonth) {
+                const ds = formatDateYYYYMMDD(new Date(year, month, dayNum));
+                const tc = logs.filter(l => l.date === ds).length;
+                const icon = ds < todayStr ? '🟢' : ds === todayStr ? '🟡' : '🔴';
+                td.setAttribute('data-date', ds);
+                td.className = 'cal-cell';
+                td.innerHTML = `${dayNum}<br><span class="small">${icon}</span>${tc > 0 ? `<br>📋${tc}` : ''}`;
+                td.onclick = function () {
+                    document.querySelectorAll('#careCalendarBody .cal-cell').forEach(c => c.classList.remove('selected-day'));
+                    this.classList.add('selected-day');
+                    refreshCareHistoryPanel(this.getAttribute('data-date'));
+                };
+            }
+            tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+    }
+}
+
+function refreshCareHistoryPanel(dateStr) {
+    const p = careProfiles.find(x => x.id === activeCareProfileId);
+    if (!p) return;
+    const logs = p.logs.filter(l => l.date === dateStr);
+    document.getElementById('careDayHistoryPanel').innerHTML = logs.length
+        ? logs.map(l => `<div class="small mb-2">💊 <strong>${l.medicine}</strong> (${l.dosage}) — ${l.timeTaken} — <span style="color:${l.riskLevel==='Safe'?'#22C55E':l.riskLevel==='Moderate Risk'?'#FACC15':'#EF4444'}">${l.riskLevel}</span></div>`).join('')
+        : '<span class="text-secondary">No logs for this date.</span>';
+}
+
+function speakCareLog() {
+    const p = careProfiles.find(x => x.id === activeCareProfileId);
+    if (!p || !p.logs.length) { speak('No medication logs for this member.'); return; }
+    const text = p.logs.map(l => `${l.medicine} ${l.dosage} at ${l.timeTaken}. Risk: ${l.riskLevel}.`).join(' ');
+    speak(text);
+}
+
+function openAddProfileModal() {
+    avatarIndex = 0;
+    document.getElementById('createAvatarDisplay').textContent = avatarOptions[0];
+    document.getElementById('newProfileName').value = '';
+    document.getElementById('newProfileRelation').value = '';
+    document.getElementById('addProfileModal').classList.add('open');
+}
+function closeAddProfileModal() { document.getElementById('addProfileModal').classList.remove('open'); }
+function cycleAvatar() {
+    avatarIndex = (avatarIndex + 1) % avatarOptions.length;
+    document.getElementById('createAvatarDisplay').textContent = avatarOptions[avatarIndex];
+}
+function createProfile() {
+    const name = document.getElementById('newProfileName').value.trim();
+    const relation = document.getElementById('newProfileRelation').value.trim();
+    if (!name || !relation) { alert('Please enter name and relationship.'); return; }
+    careProfiles.push({ id: Date.now(), name, relation, avatar: avatarOptions[avatarIndex], logs: [] });
+    closeAddProfileModal();
+    renderCareProfiles();
+    showTemporaryMessage(`✅ Added ${name} to your Care Circle!`);
+}
+
+function openDeleteConfirm() {
+    const p = careProfiles.find(x => x.id === activeCareProfileId);
+    if (!p) return;
+    document.getElementById('deleteAvatar').textContent = p.avatar;
+    document.getElementById('deleteConfirmText').textContent = `Are you sure you want to remove ${p.name}'s profile and all their logs?`;
+    document.getElementById('deleteConfirmModal').classList.add('open');
+}
+function closeDeleteConfirm() { document.getElementById('deleteConfirmModal').classList.remove('open'); }
+function confirmDeleteProfile() {
+    careProfiles = careProfiles.filter(x => x.id !== activeCareProfileId);
+    activeCareProfileId = null;
+    closeDeleteConfirm();
+    showCareCircleList();
+    showTemporaryMessage('🗑️ Profile removed from Care Circle.');
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────
+$(document).ready(function () {
+    flatpickr('#manualTimePicker', { enableTime: true, noCalendar: true, dateFormat: 'H:i', time_24hr: true, defaultHour: new Date().getHours(), defaultMinute: new Date().getMinutes() });
+    flatpickr('#schedTimePicker', { enableTime: true, noCalendar: true, dateFormat: 'H:i', time_24hr: true });
+
+    $('#confirmYesBtn').click(confirmTakenMedicine);
+    $('#confirmNoBtn').click(cancelReminder);
+    $('#saveScheduleBtn').click(saveScheduleForDate);
+    $('#confirmManualAddBtn').click(manualAddMedicine);
+    $('#prevMonthBtn').click(() => { currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1); renderCalendar(); });
+    $('#nextMonthBtn').click(() => { currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1); renderCalendar(); });
+
+    // Care Circle calendar nav
+    $('#carePrevMonthBtn').click(() => {
+        careCalendarDate.setMonth(careCalendarDate.getMonth() - 1);
+        if (activeCareProfileId) renderCareCalendar();
+    });
+    $('#careNextMonthBtn').click(() => {
+        careCalendarDate.setMonth(careCalendarDate.getMonth() + 1);
+        if (activeCareProfileId) renderCareCalendar();
+    });
+
+    renderCalendar();
+    updateLogsUI();
+    renderCareProfiles();
+
+    // Demo schedule
+    const today = getTodayStr();
+    if (!schedules[today]) schedules[today] = [];
+    if (schedules[today].length === 0) {
+        schedules[today].push({ medicine: 'Biogesic', dosage: '500mg', time: '08:00' });
+        schedules[today].push({ medicine: 'Neozep Forte', dosage: '1 tablet', time: '20:00' });
+    }
+    renderCalendar();
+});
+</script>
+</body>
+</html>
