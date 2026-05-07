@@ -302,11 +302,6 @@ if __name__ == "__main__":
 import os
 from pathlib import Path
 
-# Get the directory where index.py is located
-BASE_DIR = Path(__file__).resolve().parent.parent 
-
+BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / "models" / "best.pt"
-DB_PATH    = BASE_DIR / "utils" / "pill_database.json"
-
-# Initialize YOLO inside the app so it persists between requests
-model = YOLO(str(MODEL_PATH))
+DB_PATH = BASE_DIR / "pill_database.json" # Adjust based on your folder
