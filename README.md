@@ -92,4 +92,4 @@ Fatima
 
 ACOMSS (Adamson Computer Science Society)
 
-Developed by the AudioDose Team.
+Developed by the Four Loop Team.
